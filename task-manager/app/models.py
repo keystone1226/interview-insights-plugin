@@ -198,12 +198,12 @@ class TaskHistory(SQLModel, table=True):
     """Records every meaningful change to a task for weekly report generation."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    task_id: int = Field(foreign_key="task.id")
+    task_id: int = Field(index=True)
     task_title: str = Field(max_length=200)
     field_name: str = Field(max_length=50)  # e.g. "status", "assignee_id", "title"
     old_value: Optional[str] = Field(default=None)
     new_value: Optional[str] = Field(default=None)
-    changed_by_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    changed_by_id: Optional[int] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

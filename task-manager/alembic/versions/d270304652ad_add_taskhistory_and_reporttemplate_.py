@@ -37,10 +37,9 @@ def upgrade() -> None:
     sa.Column('new_value', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('changed_by_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['changed_by_id'], ['user.id'], ),
-    sa.ForeignKeyConstraint(['task_id'], ['task.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index('ix_taskhistory_task_id', 'taskhistory', ['task_id'])
     # ### end Alembic commands ###
 
 
