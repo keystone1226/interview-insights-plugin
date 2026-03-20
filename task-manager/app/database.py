@@ -43,7 +43,7 @@ def run_migrations():
     backup_database()
     try:
         config = _get_alembic_config()
-        command.upgrade(config, "head")
+        command.upgrade(config, "heads")
         print("  Database is up to date.")
     except Exception as e:
         print(f"  Migration failed: {e}")
