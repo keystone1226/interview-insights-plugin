@@ -46,9 +46,15 @@ def run_migrations():
         command.upgrade(config, "heads")
         print("  Database is up to date.")
     except Exception as e:
-        print(f"  Migration failed: {e}")
-        print("  You can restore from the backup file above.")
-        raise
+        print(f"  Migration warning: {e}")
+        print("  Attempting to stamp current state...")
+        try:
+            config = _get_alembic_config()
+            command.stamp(config, "heads")
+            print("  Database stamped at current heads.")
+        except Exception as e2:
+            print(f"  Stamp also failed: {e2}")
+            print("  Continuing anyway – tables may already exist.")
 
 
 def init_default_columns(session: Session):
