@@ -134,10 +134,13 @@ async def generate_report(
     start_date = since
     period_label = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
 
-    report_text = await generate_weekly_report(
-        task_changes=task_changes,
-        example_report=template.content,
-        period_label=period_label,
-    )
+    try:
+        report_text = await generate_weekly_report(
+            task_changes=task_changes,
+            example_report=template.content,
+            period_label=period_label,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
     return {"report": report_text, "period": period_label, "changes_count": len(task_changes)}

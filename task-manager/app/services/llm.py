@@ -35,17 +35,27 @@ async def chat_completion(
         "max_tokens": max_tokens,
     }
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(
-            f"{LLM_ENDPOINT}/v1/chat/completions",
-            headers=headers,
-            json=payload,
-        )
-        resp.raise_for_status()
-        data = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(
+                f"{LLM_ENDPOINT}/v1/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.ConnectError:
+        raise RuntimeError("LLM API 서버에 연결할 수 없습니다. 엔드포인트를 확인하세요.")
+    except httpx.TimeoutException:
+        raise RuntimeError("LLM API 요청 시간이 초과되었습니다.")
+    except httpx.HTTPStatusError as e:
+        raise RuntimeError(f"LLM API 오류 (HTTP {e.response.status_code})")
 
     # OpenAI-compatible response format
-    return data["choices"][0]["message"]["content"]
+    try:
+        return data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError):
+        raise RuntimeError("LLM API 응답 형식이 올바르지 않습니다.")
 
 
 async def generate_weekly_report(

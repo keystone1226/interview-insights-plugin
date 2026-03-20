@@ -1,6 +1,7 @@
 """Notification routes."""
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.database import get_session
@@ -24,12 +25,12 @@ def list_notifications(
 
 @router.get("/users/{user_id}/notifications/count")
 def notification_count(user_id: int, session: Session = Depends(get_session)):
-    query = (
-        select(Notification)
+    count = session.exec(
+        select(func.count())
+        .select_from(Notification)
         .where(Notification.user_id == user_id)
         .where(Notification.is_read == False)  # noqa: E712
-    )
-    count = len(session.exec(query).all())
+    ).one()
     return {"unread_count": count}
 
 

@@ -6,7 +6,7 @@ import socket
 import uvicorn
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlmodel import Session
 
 from app.config import DEFAULT_HOST, DEFAULT_PORT, UPLOAD_DIR
@@ -49,6 +49,11 @@ async def serve_css():
 @app.get("/app.js")
 async def serve_js():
     return FileResponse(STATIC_DIR + "/app.js", media_type="application/javascript")
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    return Response(status_code=204)
 
 
 def get_local_ip() -> str:

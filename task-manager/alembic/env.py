@@ -11,7 +11,9 @@ from app.models import (  # noqa: F401 - ensure all models are registered
     BoardColumn,
     Comment,
     Notification,
+    ReportTemplate,
     Task,
+    TaskHistory,
     User,
 )
 
