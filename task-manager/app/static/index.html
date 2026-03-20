@@ -11,6 +11,7 @@
   <header class="header">
     <h1>Task Manager</h1>
     <div class="header-actions">
+      <button class="btn btn-sm btn-secondary" id="reportBtn" title="Weekly Report">Weekly Report</button>
       <button class="notification-bell" id="notifBell" title="Notifications">
         &#128276;
         <span class="notification-badge" id="notifBadge" style="display:none">0</span>
@@ -110,6 +111,60 @@
           <button type="submit" class="btn btn-primary">Save</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Report Modal -->
+  <div class="modal-overlay" id="reportModal">
+    <div class="modal" style="max-width:720px">
+      <h2>Weekly Report</h2>
+
+      <!-- Template Section -->
+      <div class="form-group">
+        <label>Example Report Template</label>
+        <textarea id="reportTemplate" rows="6" placeholder="예시 주간보고서를 붙여넣으세요. LLM이 이 형식을 따라 보고서를 생성합니다."></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button type="button" class="btn btn-sm btn-secondary" id="saveTemplateBtn">Save Template</button>
+          <button type="button" class="btn btn-sm btn-secondary" id="loadTemplateBtn">Load Saved</button>
+        </div>
+      </div>
+
+      <!-- Period Selection -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Period (days)</label>
+          <select id="reportDays">
+            <option value="7" selected>Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end">
+          <button type="button" class="btn btn-primary" id="generateReportBtn" style="width:100%">Generate Report</button>
+        </div>
+      </div>
+
+      <!-- Changes Preview -->
+      <div class="form-group" id="changesPreviewGroup" style="display:none">
+        <label>Task Changes (<span id="changesCount">0</span>)</label>
+        <div id="changesPreview" class="changes-preview"></div>
+      </div>
+
+      <!-- Generated Report -->
+      <div class="form-group" id="reportResultGroup" style="display:none">
+        <label>Generated Report</label>
+        <div id="reportResult" class="report-result"></div>
+        <button type="button" class="btn btn-sm btn-secondary" id="copyReportBtn" style="margin-top:8px">Copy to Clipboard</button>
+      </div>
+
+      <!-- Loading -->
+      <div id="reportLoading" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">
+        Generating report...
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="closeReportBtn">Close</button>
+      </div>
     </div>
   </div>
 

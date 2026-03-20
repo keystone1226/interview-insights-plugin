@@ -11,7 +11,7 @@ from sqlmodel import Session
 
 from app.config import DEFAULT_HOST, DEFAULT_PORT, UPLOAD_DIR
 from app.database import engine, init_default_columns, run_migrations
-from app.routers import columns, comments, notifications, tasks, users
+from app.routers import columns, comments, notifications, reports, tasks, users
 
 app = FastAPI(title="Task Manager", version="0.1.0")
 
@@ -21,6 +21,7 @@ app.include_router(tasks.router)
 app.include_router(comments.router)
 app.include_router(notifications.router)
 app.include_router(columns.router)
+app.include_router(reports.router)
 
 # Mount static files
 STATIC_DIR = str(__file__.replace("main.py", "") + "static")

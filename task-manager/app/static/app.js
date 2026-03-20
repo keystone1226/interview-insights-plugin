@@ -526,6 +526,136 @@ function timeAgo(dateStr) {
   return `${days}d ago`;
 }
 
+/* ── Weekly Report ─────────────────────────────── */
+document.getElementById('reportBtn').addEventListener('click', () => {
+  document.getElementById('reportModal').classList.add('active');
+  document.getElementById('reportResultGroup').style.display = 'none';
+  document.getElementById('changesPreviewGroup').style.display = 'none';
+  document.getElementById('reportLoading').style.display = 'none';
+  loadChangesPreview();
+});
+
+document.getElementById('closeReportBtn').addEventListener('click', () => {
+  document.getElementById('reportModal').classList.remove('active');
+});
+
+document.getElementById('reportModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) {
+    document.getElementById('reportModal').classList.remove('active');
+  }
+});
+
+async function loadChangesPreview() {
+  const days = document.getElementById('reportDays').value;
+  try {
+    const histories = await api(`/api/reports/history?days=${days}`);
+    const group = document.getElementById('changesPreviewGroup');
+    const preview = document.getElementById('changesPreview');
+    document.getElementById('changesCount').textContent = histories.length;
+
+    if (histories.length === 0) {
+      preview.innerHTML = '<div style="color:var(--text-muted)">No changes in this period</div>';
+    } else {
+      preview.innerHTML = histories.map(h => {
+        const fieldLabel = {
+          created: 'Created', deleted: 'Deleted', status: 'Status',
+          title: 'Title', priority: 'Priority', assignee_id: 'Assignee',
+          description: 'Description', due_date: 'Due Date', tags: 'Tags',
+        }[h.field_name] || h.field_name;
+
+        let detail = '';
+        if (h.field_name === 'created') {
+          detail = `→ ${h.new_value}`;
+        } else if (h.field_name === 'deleted') {
+          detail = '(deleted)';
+        } else {
+          detail = `${h.old_value || '(empty)'} → ${h.new_value || '(empty)'}`;
+        }
+
+        return `<div class="change-item">
+          <span class="change-date">${h.created_at.substring(0, 16).replace('T', ' ')}</span>
+          <strong>${escHtml(h.task_title)}</strong>
+          — <span class="change-field">${fieldLabel}</span>: ${escHtml(detail)}
+        </div>`;
+      }).join('');
+    }
+    group.style.display = 'block';
+  } catch (e) {
+    console.error('Failed to load changes:', e);
+  }
+}
+
+document.getElementById('reportDays').addEventListener('change', loadChangesPreview);
+
+document.getElementById('saveTemplateBtn').addEventListener('click', async () => {
+  const content = document.getElementById('reportTemplate').value.trim();
+  if (!content) return alert('Please enter an example report.');
+  try {
+    await api('/api/reports/templates', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'default', content }),
+    });
+    alert('Template saved!');
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+});
+
+document.getElementById('loadTemplateBtn').addEventListener('click', async () => {
+  try {
+    const templates = await api('/api/reports/templates');
+    if (templates.length > 0) {
+      document.getElementById('reportTemplate').value = templates[0].content;
+    } else {
+      alert('No saved templates.');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+});
+
+document.getElementById('generateReportBtn').addEventListener('click', async () => {
+  const template = document.getElementById('reportTemplate').value.trim();
+  if (!template) return alert('Please enter or load an example report template first.');
+
+  const days = document.getElementById('reportDays').value;
+  const loading = document.getElementById('reportLoading');
+  const resultGroup = document.getElementById('reportResultGroup');
+  const generateBtn = document.getElementById('generateReportBtn');
+
+  // Save template automatically
+  try {
+    await api('/api/reports/templates', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'default', content: template }),
+    });
+  } catch {}
+
+  loading.style.display = 'block';
+  resultGroup.style.display = 'none';
+  generateBtn.disabled = true;
+
+  try {
+    const result = await api(`/api/reports/generate?days=${days}`, { method: 'POST' });
+    document.getElementById('reportResult').textContent = result.report;
+    resultGroup.style.display = 'block';
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    loading.style.display = 'none';
+    generateBtn.disabled = false;
+  }
+});
+
+document.getElementById('copyReportBtn').addEventListener('click', () => {
+  const text = document.getElementById('reportResult').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyReportBtn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy to Clipboard'; }, 2000);
+  });
+});
+
 /* ── Close panels on outside click ──────────────── */
 document.addEventListener('click', e => {
   const bell = document.getElementById('notifBell');

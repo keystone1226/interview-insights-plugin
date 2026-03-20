@@ -18,3 +18,12 @@ SMTP_PASSWORD = os.getenv("TASK_SMTP_PASSWORD", "")
 # Server settings
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
+
+# SDS LLM API settings
+LLM_ENDPOINT = os.getenv(
+    "TASK_LLM_ENDPOINT",
+    "https://nsds-api.fabrix-s.samsungsds.com/sds/trial/api-llm",
+)
+LLM_CLIENT_KEY = os.getenv("TASK_LLM_CLIENT_KEY", "")
+LLM_PASS_KEY = os.getenv("TASK_LLM_PASS_KEY", "")
+LLM_MODEL = os.getenv("TASK_LLM_MODEL", "gpt-oss-120b")

@@ -502,6 +502,48 @@ body {
   margin-top: 8px;
 }
 
+/* ── Report ────────────────────────────────────── */
+.changes-preview {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.changes-preview .change-item {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.changes-preview .change-item:last-child { border-bottom: none; }
+
+.changes-preview .change-field {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.changes-preview .change-date {
+  color: var(--text-muted);
+  font-size: 11px;
+  float: right;
+}
+
+.report-result {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
 /* ── Scrollbar ──────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

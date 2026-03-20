@@ -16,6 +16,7 @@ from app.models import (
     NotificationType,
     Task,
     TaskCreate,
+    TaskHistory,
     TaskRead,
     TaskStatusUpdate,
     TaskUpdate,
@@ -23,6 +24,26 @@ from app.models import (
 )
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+
+
+def _record_history(
+    session: Session,
+    task: Task,
+    field_name: str,
+    old_value: str | None,
+    new_value: str | None,
+    changed_by_id: int | None = None,
+):
+    """Record a task change for weekly report generation."""
+    history = TaskHistory(
+        task_id=task.id,
+        task_title=task.title,
+        field_name=field_name,
+        old_value=str(old_value) if old_value is not None else None,
+        new_value=str(new_value) if new_value is not None else None,
+        changed_by_id=changed_by_id,
+    )
+    session.add(history)
 
 
 def _notify_assignment(session: Session, task: Task, changed_by: str | None = None):
@@ -76,9 +97,10 @@ def create_task(data: TaskCreate, session: Session = Depends(get_session)):
     session.add(task)
     session.commit()
     session.refresh(task)
+    _record_history(session, task, "created", None, task.status)
     if task.assignee_id:
         _notify_assignment(session, task)
-        session.commit()
+    session.commit()
     return task
 
 
@@ -96,6 +118,9 @@ def update_task(task_id: int, data: TaskUpdate, session: Session = Depends(get_s
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    # Capture old values for history tracking
+    tracked_fields = {"title", "description", "status", "priority", "assignee_id", "due_date", "tags"}
+    old_values = {f: getattr(task, f) for f in tracked_fields}
     old_status = task.status
     old_assignee = task.assignee_id
     update_data = data.model_dump(exclude_unset=True)
@@ -109,6 +134,11 @@ def update_task(task_id: int, data: TaskUpdate, session: Session = Depends(get_s
         _notify_assignment(session, task)
     if "status" in update_data and update_data["status"] != old_status:
         _notify_status_change(session, task, old_status, update_data["status"])
+
+    # Record history for changed fields
+    for field in tracked_fields:
+        if field in update_data and str(old_values[field]) != str(update_data[field]):
+            _record_history(session, task, field, old_values[field], update_data[field])
 
     session.add(task)
     session.commit()
@@ -131,6 +161,7 @@ def update_task_status(
 
     if old_status != data.status:
         _notify_status_change(session, task, old_status, data.status)
+        _record_history(session, task, "status", old_status, data.status)
 
     session.add(task)
     session.commit()
@@ -143,6 +174,8 @@ def delete_task(task_id: int, session: Session = Depends(get_session)):
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    # Record deletion history before deleting
+    _record_history(session, task, "deleted", task.status, None)
     # Clean up image file if exists
     if task.image_path:
         img_file = UPLOAD_DIR / Path(task.image_path).name

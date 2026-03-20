@@ -189,3 +189,56 @@ class NotificationRead(SQLModel):
     message: str
     is_read: bool
     created_at: datetime
+
+
+# ── TaskHistory ──────────────────────────────────
+
+
+class TaskHistory(SQLModel, table=True):
+    """Records every meaningful change to a task for weekly report generation."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    task_id: int = Field(foreign_key="task.id")
+    task_title: str = Field(max_length=200)
+    field_name: str = Field(max_length=50)  # e.g. "status", "assignee_id", "title"
+    old_value: Optional[str] = Field(default=None)
+    new_value: Optional[str] = Field(default=None)
+    changed_by_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class TaskHistoryRead(SQLModel):
+    id: int
+    task_id: int
+    task_title: str
+    field_name: str
+    old_value: Optional[str]
+    new_value: Optional[str]
+    changed_by_id: Optional[int]
+    created_at: datetime
+
+
+# ── ReportTemplate ───────────────────────────────
+
+
+class ReportTemplate(SQLModel, table=True):
+    """Stores a user-provided example weekly report for LLM style reference."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(default="default", max_length=100)
+    content: str  # The example report text
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ReportTemplateCreate(SQLModel):
+    name: str = "default"
+    content: str
+
+
+class ReportTemplateRead(SQLModel):
+    id: int
+    name: str
+    content: str
+    created_at: datetime
+    updated_at: datetime
