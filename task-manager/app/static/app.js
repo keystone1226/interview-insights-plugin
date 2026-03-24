@@ -545,8 +545,35 @@ document.getElementById('reportBtn').addEventListener('click', () => {
   document.getElementById('reportResultGroup').style.display = 'none';
   document.getElementById('changesPreviewGroup').style.display = 'none';
   document.getElementById('reportLoading').style.display = 'none';
+  checkLlmStatus();
   loadChangesPreview();
 });
+
+async function checkLlmStatus() {
+  const banner = document.getElementById('llmStatusBanner');
+  banner.style.display = 'block';
+  banner.style.background = '#f3f4f6';
+  banner.style.color = '#6b7280';
+  banner.textContent = 'LLM API 연결 상태 확인 중...';
+
+  try {
+    const res = await api('/api/reports/llm-status');
+    if (res.reachable) {
+      banner.style.background = '#ecfdf5';
+      banner.style.color = '#059669';
+      banner.textContent = 'LLM API 연결 성공';
+      setTimeout(() => { banner.style.display = 'none'; }, 3000);
+    } else {
+      banner.style.background = '#fef2f2';
+      banner.style.color = '#dc2626';
+      banner.textContent = 'LLM API 연결 실패: ' + (res.error || 'Unknown error');
+    }
+  } catch (e) {
+    banner.style.background = '#fef2f2';
+    banner.style.color = '#dc2626';
+    banner.textContent = 'LLM 상태 확인 실패: ' + e.message;
+  }
+}
 
 document.getElementById('closeReportBtn').addEventListener('click', () => {
   document.getElementById('reportModal').classList.remove('active');

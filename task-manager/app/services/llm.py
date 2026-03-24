@@ -8,8 +8,22 @@ import httpx
 from app.config import LLM_CLIENT_KEY, LLM_ENDPOINT, LLM_MODEL, LLM_PASS_KEY
 
 
+def _is_ascii(s: str) -> bool:
+    try:
+        s.encode("ascii")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
 def is_llm_configured() -> bool:
-    return bool(LLM_ENDPOINT and LLM_CLIENT_KEY and LLM_PASS_KEY)
+    return bool(
+        LLM_ENDPOINT
+        and LLM_CLIENT_KEY
+        and LLM_PASS_KEY
+        and _is_ascii(LLM_CLIENT_KEY)
+        and _is_ascii(LLM_PASS_KEY)
+    )
 
 
 async def chat_completion(
@@ -44,6 +58,8 @@ async def chat_completion(
             )
             resp.raise_for_status()
             data = resp.json()
+    except UnicodeEncodeError:
+        raise RuntimeError("API 키에 유효하지 않은 문자가 포함되어 있습니다. .env 파일에서 실제 API 키(ASCII)를 입력하세요.")
     except httpx.ConnectError:
         raise RuntimeError("LLM API 서버에 연결할 수 없습니다. 엔드포인트를 확인하세요.")
     except httpx.TimeoutException:

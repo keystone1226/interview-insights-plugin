@@ -19,6 +19,36 @@ from app.services.llm import generate_weekly_report, is_llm_configured
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
+# ── LLM Health Check ────────────────────────────
+
+
+@router.get("/llm-status")
+async def llm_status():
+    """Check whether the LLM API key is configured and reachable."""
+    if not is_llm_configured():
+        return {
+            "configured": False,
+            "reachable": False,
+            "error": "LLM API 키가 설정되지 않았거나 유효하지 않습니다. .env 파일에서 TASK_LLM_CLIENT_KEY, TASK_LLM_PASS_KEY를 확인하세요.",
+        }
+
+    from app.services.llm import chat_completion
+
+    try:
+        reply = await chat_completion(
+            messages=[{"role": "user", "content": "Hello, respond with OK."}],
+            max_tokens=16,
+        )
+        return {"configured": True, "reachable": True, "reply": reply}
+    except (RuntimeError, UnicodeEncodeError) as e:
+        error_msg = str(e)
+        if isinstance(e, UnicodeEncodeError):
+            error_msg = "API 키에 유효하지 않은 문자가 포함되어 있습니다. .env 파일에서 실제 API 키를 입력하세요."
+        return {"configured": True, "reachable": False, "error": error_msg}
+    except Exception as e:
+        return {"configured": True, "reachable": False, "error": str(e)}
+
+
 # ── Report Template CRUD ─────────────────────────
 
 
@@ -140,7 +170,10 @@ async def generate_report(
             example_report=template.content,
             period_label=period_label,
         )
-    except RuntimeError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+    except (RuntimeError, UnicodeEncodeError) as e:
+        detail = str(e)
+        if isinstance(e, UnicodeEncodeError):
+            detail = "API 키에 유효하지 않은 문자가 포함되어 있습니다. .env 파일에서 실제 API 키를 입력하세요."
+        raise HTTPException(status_code=502, detail=detail)
 
     return {"report": report_text, "period": period_label, "changes_count": len(task_changes)}
