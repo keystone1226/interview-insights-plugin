@@ -54,13 +54,17 @@ async def llm_status():
         "max_tokens": 16,
     }
 
-    # Probe: GET on base endpoint, /v1/models, and POST on root
+    # Try both prod and trial, with different API names
+    base = "https://nsds-api.fabrix-s.samsungsds.com"
     probes = [
-        ("GET", LLM_ENDPOINT, None),
-        ("GET", f"{LLM_ENDPOINT}/v1/models", None),
-        ("GET", f"{LLM_ENDPOINT}/models", None),
-        ("POST", LLM_ENDPOINT, payload),
-        ("GET", LLM_ENDPOINT.rsplit("/", 1)[0], None),  # parent path
+        ("POST", f"{base}/sds/prod/api-llm/v1/chat/completions", payload),
+        ("POST", f"{base}/sds/trial/api-llm/v1/chat/completions", payload),
+        ("POST", f"{base}/sds/prod/llm/v1/chat/completions", payload),
+        ("POST", f"{base}/sds/trial/llm/v1/chat/completions", payload),
+        ("POST", f"{base}/sds/prod/api-llm/chat/completions", payload),
+        ("POST", f"{base}/sds/trial/api-llm/chat/completions", payload),
+        ("POST", f"{base}/api/v1/chat/completions", payload),
+        ("POST", f"{base}/v1/chat/completions", payload),
     ]
 
     results = []
