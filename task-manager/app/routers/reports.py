@@ -25,28 +25,56 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 @router.get("/llm-status")
 async def llm_status():
     """Check whether the LLM API key is configured and reachable."""
+    import httpx
+
+    from app.config import LLM_CLIENT_KEY, LLM_ENDPOINT, LLM_MODEL_ID, LLM_PASS_KEY
+
     if not is_llm_configured():
         return {
             "configured": False,
             "reachable": False,
-            "error": "LLM API 키가 설정되지 않았거나 유효하지 않습니다. .env 파일에서 TASK_LLM_CLIENT_KEY, TASK_LLM_PASS_KEY를 확인하세요.",
+            "error": "LLM API 키가 설정되지 않았거나 유효하지 않습니다. .env 파일에서 TASK_LLM_CLIENT_KEY, TASK_LLM_PASS_KEY, TASK_LLM_MODEL_ID를 확인하세요.",
+            "debug": {
+                "endpoint": LLM_ENDPOINT,
+                "client_key_set": bool(LLM_CLIENT_KEY),
+                "pass_key_set": bool(LLM_PASS_KEY),
+                "model_id_set": bool(LLM_MODEL_ID),
+            },
         }
 
-    from app.services.llm import chat_completion
+    request_url = f"{LLM_ENDPOINT}/chat/completions"
+    headers = {
+        "x-fabrix-client": LLM_CLIENT_KEY,
+        "x-openapi-token": LLM_PASS_KEY,
+        "x-llm-model-id": LLM_MODEL_ID,
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "/mnt/models",
+        "messages": [{"role": "user", "content": "Hello, respond with OK."}],
+        "max_tokens": 16,
+    }
 
     try:
-        reply = await chat_completion(
-            messages=[{"role": "user", "content": "Hello, respond with OK."}],
-            max_tokens=16,
-        )
-        return {"configured": True, "reachable": True, "reply": reply}
-    except (RuntimeError, UnicodeEncodeError) as e:
-        error_msg = str(e)
-        if isinstance(e, UnicodeEncodeError):
-            error_msg = "API 키에 유효하지 않은 문자가 포함되어 있습니다. .env 파일에서 실제 API 키를 입력하세요."
-        return {"configured": True, "reachable": False, "error": error_msg}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(request_url, headers=headers, json=payload)
+            return {
+                "configured": True,
+                "reachable": resp.status_code < 400,
+                "debug": {
+                    "request_url": request_url,
+                    "status_code": resp.status_code,
+                    "response_headers": dict(resp.headers),
+                    "response_body": resp.text[:2000],
+                },
+            }
     except Exception as e:
-        return {"configured": True, "reachable": False, "error": str(e)}
+        return {
+            "configured": True,
+            "reachable": False,
+            "debug": {"request_url": request_url},
+            "error": f"{type(e).__name__}: {e}",
+        }
 
 
 # ── Report Template CRUD ─────────────────────────
