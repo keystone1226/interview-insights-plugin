@@ -32,3 +32,4 @@ LLM_ENDPOINT = os.getenv(
 LLM_CLIENT_KEY = os.getenv("TASK_LLM_CLIENT_KEY", "")
 LLM_PASS_KEY = os.getenv("TASK_LLM_PASS_KEY", "")
 LLM_MODEL = os.getenv("TASK_LLM_MODEL", "gpt-oss-120b")
+LLM_MODEL_ID = os.getenv("TASK_LLM_MODEL_ID", "")

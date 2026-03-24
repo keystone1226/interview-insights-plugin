@@ -5,7 +5,7 @@ from typing import Optional
 
 import httpx
 
-from app.config import LLM_CLIENT_KEY, LLM_ENDPOINT, LLM_MODEL, LLM_PASS_KEY
+from app.config import LLM_CLIENT_KEY, LLM_ENDPOINT, LLM_MODEL, LLM_MODEL_ID, LLM_PASS_KEY
 
 
 def _is_ascii(s: str) -> bool:
@@ -21,6 +21,7 @@ def is_llm_configured() -> bool:
         LLM_ENDPOINT
         and LLM_CLIENT_KEY
         and LLM_PASS_KEY
+        and LLM_MODEL_ID
         and _is_ascii(LLM_CLIENT_KEY)
         and _is_ascii(LLM_PASS_KEY)
     )
@@ -39,11 +40,12 @@ async def chat_completion(
     headers = {
         "x-fabrix-client": LLM_CLIENT_KEY,
         "x-openapi-token": LLM_PASS_KEY,
+        "x-llm-model-id": LLM_MODEL_ID,
         "Content-Type": "application/json",
     }
 
     payload = {
-        "model": model or LLM_MODEL,
+        "model": "/mnt/models",
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
@@ -52,7 +54,7 @@ async def chat_completion(
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
-                f"{LLM_ENDPOINT}/v1/chat/completions",
+                f"{LLM_ENDPOINT}/chat/completions",
                 headers=headers,
                 json=payload,
             )
