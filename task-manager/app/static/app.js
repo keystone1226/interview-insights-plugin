@@ -84,12 +84,19 @@ document.getElementById('nicknameInput').addEventListener('keydown', (e) => {
 
 /* ── Start App ──────────────────────────────────── */
 async function startApp() {
-  document.getElementById('currentUserName').textContent = currentUser.nickname;
-  await Promise.all([loadColumns(), loadUsers()]);
-  await loadTasks();
-  renderBoard();
-  pollNotifications();
-  setInterval(pollNotifications, 30000);
+  try {
+    document.getElementById('currentUserName').textContent = currentUser.nickname;
+    await Promise.all([loadColumns(), loadUsers()]);
+    await loadTasks();
+    console.log('Loaded columns:', columns.length, 'users:', allUsers.length, 'tasks:', tasks.length);
+    renderBoard();
+    console.log('Board rendered successfully');
+    pollNotifications();
+    setInterval(pollNotifications, 30000);
+  } catch (err) {
+    console.error('startApp error:', err);
+    alert('App initialization error: ' + err.message);
+  }
 }
 
 /* ── Data Loading ───────────────────────────────── */
@@ -212,8 +219,14 @@ function renderBoard() {
     });
 
     // Add task button
-    colEl.querySelector('.add-task-btn').addEventListener('click', () => {
-      openTaskModal(null, col.name);
+    colEl.querySelector('.add-task-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        openTaskModal(null, col.name);
+      } catch (err) {
+        console.error('openTaskModal error:', err);
+        alert('Error opening modal: ' + err.message);
+      }
     });
   });
 

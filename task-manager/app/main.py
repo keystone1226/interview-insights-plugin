@@ -56,12 +56,16 @@ async def serve_index():
 
 @app.get("/style.css")
 async def serve_css():
-    return FileResponse(STATIC_DIR / "style.css", media_type="text/css")
+    resp = FileResponse(STATIC_DIR / "style.css", media_type="text/css")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
 
 
 @app.get("/app.js")
 async def serve_js():
-    return FileResponse(STATIC_DIR / "app.js", media_type="application/javascript")
+    resp = FileResponse(STATIC_DIR / "app.js", media_type="application/javascript")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
 
 
 @app.get("/favicon.ico")
