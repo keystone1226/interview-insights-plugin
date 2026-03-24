@@ -37,6 +37,13 @@ def backup_database() -> str | None:
     return str(backup_path)
 
 
+def _ensure_tables():
+    """Fallback: create all tables directly if migrations fail."""
+    import app.models  # noqa: F401 - ensure all models are registered
+    SQLModel.metadata.create_all(engine)
+    print("  Tables created via SQLModel metadata (migration fallback).")
+
+
 def run_migrations():
     """Run Alembic migrations automatically on startup."""
     print("Checking database migrations...")
@@ -54,7 +61,8 @@ def run_migrations():
             print("  Database stamped at current heads.")
         except Exception as e2:
             print(f"  Stamp also failed: {e2}")
-            print("  Continuing anyway – tables may already exist.")
+        # Fallback: ensure tables exist even if alembic fails
+        _ensure_tables()
 
 
 def init_default_columns(session: Session):

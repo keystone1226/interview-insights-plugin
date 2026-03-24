@@ -2,6 +2,8 @@
 
 import argparse
 import socket
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
@@ -13,7 +15,26 @@ from app.config import DEFAULT_HOST, DEFAULT_PORT, UPLOAD_DIR
 from app.database import engine, init_default_columns, run_migrations
 from app.routers import columns, comments, notifications, reports, tasks, users
 
-app = FastAPI(title="Task Manager", version="0.1.0")
+# Resolve static directory using Path for cross-platform compatibility
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup/shutdown lifecycle handler."""
+    try:
+        run_migrations()
+    except Exception as e:
+        print(f"  Migration error (non-fatal): {e}")
+    try:
+        with Session(engine) as session:
+            init_default_columns(session)
+    except Exception as e:
+        print(f"  Column init error (non-fatal): {e}")
+    yield
+
+
+app = FastAPI(title="Task Manager", version="0.1.0", lifespan=lifespan)
 
 # Mount routers
 app.include_router(users.router)
@@ -24,31 +45,23 @@ app.include_router(columns.router)
 app.include_router(reports.router)
 
 # Mount static files
-STATIC_DIR = str(__file__.replace("main.py", "") + "static")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
-@app.on_event("startup")
-def on_startup():
-    run_migrations()
-    with Session(engine) as session:
-        init_default_columns(session)
-
-
 @app.get("/")
 async def serve_index():
-    return FileResponse(STATIC_DIR + "/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/style.css")
 async def serve_css():
-    return FileResponse(STATIC_DIR + "/style.css", media_type="text/css")
+    return FileResponse(STATIC_DIR / "style.css", media_type="text/css")
 
 
 @app.get("/app.js")
 async def serve_js():
-    return FileResponse(STATIC_DIR + "/app.js", media_type="application/javascript")
+    return FileResponse(STATIC_DIR / "app.js", media_type="application/javascript")
 
 
 @app.get("/favicon.ico")
