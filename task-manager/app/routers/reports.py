@@ -42,7 +42,13 @@ async def llm_status():
             },
         }
 
-    request_url = f"{LLM_ENDPOINT}/chat/completions"
+    # Try multiple path variants to find the correct one
+    path_variants = [
+        "/v1/chat/completions",
+        "/chat/completions",
+        "/v1/completions",
+        "/completions",
+    ]
     headers = {
         "x-fabrix-client": LLM_CLIENT_KEY,
         "x-openapi-token": LLM_PASS_KEY,
@@ -55,26 +61,38 @@ async def llm_status():
         "max_tokens": 16,
     }
 
+    results = []
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(request_url, headers=headers, json=payload)
-            return {
-                "configured": True,
-                "reachable": resp.status_code < 400,
-                "debug": {
-                    "request_url": request_url,
-                    "status_code": resp.status_code,
-                    "response_headers": dict(resp.headers),
-                    "response_body": resp.text[:2000],
-                },
-            }
+            for path in path_variants:
+                url = f"{LLM_ENDPOINT}{path}"
+                try:
+                    resp = await client.post(url, headers=headers, json=payload)
+                    results.append({
+                        "path": path,
+                        "url": url,
+                        "status_code": resp.status_code,
+                        "response_body": resp.text[:500],
+                    })
+                except Exception as e:
+                    results.append({
+                        "path": path,
+                        "url": url,
+                        "error": f"{type(e).__name__}: {e}",
+                    })
     except Exception as e:
         return {
             "configured": True,
             "reachable": False,
-            "debug": {"request_url": request_url},
             "error": f"{type(e).__name__}: {e}",
         }
+
+    return {
+        "configured": True,
+        "endpoint": LLM_ENDPOINT,
+        "model_id": LLM_MODEL_ID,
+        "results": results,
+    }
 
 
 # ── Report Template CRUD ─────────────────────────
