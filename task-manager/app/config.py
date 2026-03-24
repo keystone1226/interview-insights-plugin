@@ -3,6 +3,11 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Load .env file from project root (task-manager/)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "tasks.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
