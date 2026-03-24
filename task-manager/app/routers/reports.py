@@ -42,13 +42,6 @@ async def llm_status():
             },
         }
 
-    # Try multiple path variants to find the correct one
-    path_variants = [
-        "/v1/chat/completions",
-        "/chat/completions",
-        "/v1/completions",
-        "/completions",
-    ]
     headers = {
         "x-fabrix-client": LLM_CLIENT_KEY,
         "x-openapi-token": LLM_PASS_KEY,
@@ -61,31 +54,38 @@ async def llm_status():
         "max_tokens": 16,
     }
 
+    # Probe: GET on base endpoint, /v1/models, and POST on root
+    probes = [
+        ("GET", LLM_ENDPOINT, None),
+        ("GET", f"{LLM_ENDPOINT}/v1/models", None),
+        ("GET", f"{LLM_ENDPOINT}/models", None),
+        ("POST", LLM_ENDPOINT, payload),
+        ("GET", LLM_ENDPOINT.rsplit("/", 1)[0], None),  # parent path
+    ]
+
     results = []
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            for path in path_variants:
-                url = f"{LLM_ENDPOINT}{path}"
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            for method, url, body in probes:
                 try:
-                    resp = await client.post(url, headers=headers, json=payload)
+                    if method == "GET":
+                        resp = await client.get(url, headers=headers)
+                    else:
+                        resp = await client.post(url, headers=headers, json=body)
                     results.append({
-                        "path": path,
+                        "method": method,
                         "url": url,
                         "status_code": resp.status_code,
                         "response_body": resp.text[:500],
                     })
                 except Exception as e:
                     results.append({
-                        "path": path,
+                        "method": method,
                         "url": url,
                         "error": f"{type(e).__name__}: {e}",
                     })
     except Exception as e:
-        return {
-            "configured": True,
-            "reachable": False,
-            "error": f"{type(e).__name__}: {e}",
-        }
+        return {"configured": True, "reachable": False, "error": str(e)}
 
     return {
         "configured": True,
