@@ -221,12 +221,21 @@ class TaskHistoryRead(SQLModel):
 # ── ReportTemplate ───────────────────────────────
 
 
+DEFAULT_SYSTEM_PROMPT = (
+    "당신은 디자인 팀의 주간보고서를 작성하는 어시스턴트입니다. "
+    "사용자가 제공한 예시 보고서의 형식, 톤, 구조를 정확히 따라서 "
+    "주간 업무 변동사항을 기반으로 주간보고서를 작성해주세요. "
+    "예시와 동일한 포맷(제목, 섹션, 글머리 등)을 유지하세요."
+)
+
+
 class ReportTemplate(SQLModel, table=True):
     """Stores a user-provided example weekly report for LLM style reference."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(default="default", max_length=100)
     content: str  # The example report text
+    system_prompt: str = Field(default=DEFAULT_SYSTEM_PROMPT)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -234,11 +243,13 @@ class ReportTemplate(SQLModel, table=True):
 class ReportTemplateCreate(SQLModel):
     name: str = "default"
     content: str
+    system_prompt: Optional[str] = None
 
 
 class ReportTemplateRead(SQLModel):
     id: int
     name: str
     content: str
+    system_prompt: str
     created_at: datetime
     updated_at: datetime

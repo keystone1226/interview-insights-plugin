@@ -549,6 +549,19 @@ document.getElementById('reportBtn').addEventListener('click', () => {
   loadChangesPreview();
 });
 
+/* System Prompt toggle */
+document.getElementById('systemPromptToggle').addEventListener('click', () => {
+  const section = document.getElementById('systemPromptSection');
+  const icon = document.getElementById('systemPromptToggleIcon');
+  if (section.style.display === 'none') {
+    section.style.display = 'block';
+    icon.innerHTML = '&#9650;';
+  } else {
+    section.style.display = 'none';
+    icon.innerHTML = '&#9660;';
+  }
+});
+
 async function checkLlmStatus() {
   const banner = document.getElementById('llmStatusBanner');
   banner.style.display = 'block';
@@ -630,10 +643,11 @@ document.getElementById('reportDays').addEventListener('change', loadChangesPrev
 document.getElementById('saveTemplateBtn').addEventListener('click', async () => {
   const content = document.getElementById('reportTemplate').value.trim();
   if (!content) return alert('Please enter an example report.');
+  const systemPrompt = document.getElementById('systemPrompt').value.trim() || null;
   try {
     await api('/api/reports/templates', {
       method: 'POST',
-      body: JSON.stringify({ name: 'default', content }),
+      body: JSON.stringify({ name: 'default', content, system_prompt: systemPrompt }),
     });
     alert('Template saved!');
   } catch (e) {
@@ -646,6 +660,7 @@ document.getElementById('loadTemplateBtn').addEventListener('click', async () =>
     const templates = await api('/api/reports/templates');
     if (templates.length > 0) {
       document.getElementById('reportTemplate').value = templates[0].content;
+      document.getElementById('systemPrompt').value = templates[0].system_prompt || '';
     } else {
       alert('No saved templates.');
     }
@@ -663,11 +678,12 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
   const resultGroup = document.getElementById('reportResultGroup');
   const generateBtn = document.getElementById('generateReportBtn');
 
-  // Save template automatically
+  // Save template automatically (including system prompt)
+  const sysPrompt = document.getElementById('systemPrompt').value.trim() || null;
   try {
     await api('/api/reports/templates', {
       method: 'POST',
-      body: JSON.stringify({ name: 'default', content: template }),
+      body: JSON.stringify({ name: 'default', content: template, system_prompt: sysPrompt }),
     });
   } catch {}
 

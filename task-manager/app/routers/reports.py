@@ -115,6 +115,8 @@ def create_template(data: ReportTemplateCreate, session: Session = Depends(get_s
     ).first()
     if existing:
         existing.content = data.content
+        if data.system_prompt is not None:
+            existing.system_prompt = data.system_prompt
         existing.updated_at = datetime.utcnow()
         session.add(existing)
         session.commit()
@@ -219,6 +221,7 @@ async def generate_report(
             task_changes=task_changes,
             example_report=template.content,
             period_label=period_label,
+            system_prompt=template.system_prompt,
         )
     except (RuntimeError, UnicodeEncodeError) as e:
         detail = str(e)

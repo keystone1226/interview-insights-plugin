@@ -85,19 +85,17 @@ async def generate_weekly_report(
     task_changes: list[dict],
     example_report: str,
     period_label: str,
+    system_prompt: Optional[str] = None,
 ) -> str:
     """Generate a weekly report based on task changes and an example format."""
+    from app.models import DEFAULT_SYSTEM_PROMPT
+
     changes_text = json.dumps(task_changes, ensure_ascii=False, indent=2)
 
     messages = [
         {
             "role": "system",
-            "content": (
-                "당신은 디자인 팀의 주간보고서를 작성하는 어시스턴트입니다. "
-                "사용자가 제공한 예시 보고서의 형식, 톤, 구조를 정확히 따라서 "
-                "주간 업무 변동사항을 기반으로 주간보고서를 작성해주세요. "
-                "예시와 동일한 포맷(제목, 섹션, 글머리 등)을 유지하세요."
-            ),
+            "content": system_prompt or DEFAULT_SYSTEM_PROMPT,
         },
         {
             "role": "user",
