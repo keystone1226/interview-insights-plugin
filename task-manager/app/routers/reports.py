@@ -14,6 +14,7 @@ from app.models import (
     TaskHistory,
     TaskHistoryRead,
 )
+from sqlmodel import delete
 from app.services.llm import generate_weekly_report, is_llm_configured
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
@@ -155,6 +156,16 @@ def list_history(
         .where(TaskHistory.created_at >= since)
         .order_by(TaskHistory.created_at.desc())
     ).all()
+
+
+# ── Clear History ────────────────────────────────
+
+
+@router.delete("/history", status_code=204)
+def clear_history(session: Session = Depends(get_session)):
+    """Delete all task change history records."""
+    session.exec(delete(TaskHistory))
+    session.commit()
 
 
 # ── Generate Report ──────────────────────────────

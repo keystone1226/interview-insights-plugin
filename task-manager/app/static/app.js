@@ -640,6 +640,16 @@ async function loadChangesPreview() {
 
 document.getElementById('reportDays').addEventListener('change', loadChangesPreview);
 
+document.getElementById('clearHistoryBtn').addEventListener('click', async () => {
+  if (!confirm('모든 태스크 변동 히스토리를 삭제하시겠습니까?\n(태스크 자체는 유지됩니다)')) return;
+  try {
+    await api('/api/reports/history', { method: 'DELETE' });
+    loadChangesPreview();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+});
+
 document.getElementById('saveTemplateBtn').addEventListener('click', async () => {
   const content = document.getElementById('reportTemplate').value.trim();
   if (!content) return alert('Please enter an example report.');

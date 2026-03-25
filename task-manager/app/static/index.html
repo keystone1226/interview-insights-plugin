@@ -161,7 +161,10 @@
 
       <!-- Changes Preview -->
       <div class="form-group" id="changesPreviewGroup" style="display:none">
-        <label>Task Changes (<span id="changesCount">0</span>)</label>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <label>Task Changes (<span id="changesCount">0</span>)</label>
+          <button type="button" class="btn btn-sm btn-danger" id="clearHistoryBtn" style="font-size:11px;padding:2px 8px">Clear History</button>
+        </div>
         <div id="changesPreview" class="changes-preview"></div>
       </div>
 
