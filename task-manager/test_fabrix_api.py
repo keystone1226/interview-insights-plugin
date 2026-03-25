@@ -32,6 +32,12 @@ from dotenv import load_dotenv
 # .env 로드
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
+# FabriX API는 프록시를 거치면 타임아웃 발생 → 프록시 우회
+os.environ.pop("HTTP_PROXY", None)
+os.environ.pop("HTTPS_PROXY", None)
+os.environ.pop("http_proxy", None)
+os.environ.pop("https_proxy", None)
+
 CLIENT_KEY = os.getenv("TASK_LLM_CLIENT_KEY", "")
 PASS_KEY = os.getenv("TASK_LLM_PASS_KEY", "")
 ENDPOINT = os.getenv(

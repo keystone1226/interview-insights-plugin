@@ -1,11 +1,16 @@
 """SDS OpenAPI LLM integration service."""
 
 import json
+import os
 from typing import Optional
 
 import httpx
 
 from app.config import LLM_CLIENT_KEY, LLM_ENDPOINT, LLM_MODEL, LLM_MODEL_ID, LLM_PASS_KEY
+
+# FabriX API는 사내 프록시를 거치면 타임아웃 발생 → 프록시 우회
+for _k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+    os.environ.pop(_k, None)
 
 
 def _is_ascii(s: str) -> bool:
