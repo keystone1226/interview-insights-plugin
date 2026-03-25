@@ -42,7 +42,7 @@ CLIENT_KEY = os.getenv("TASK_LLM_CLIENT_KEY", "")
 PASS_KEY = os.getenv("TASK_LLM_PASS_KEY", "")
 ENDPOINT = os.getenv(
     "TASK_LLM_ENDPOINT",
-    "https://nsds-api.fabrix-s.samsungsds.com/sds/prod/api-llm/v1",
+    "https://nsds-api.fabrix-s.samsungsds.com/sds/prod/api-llm/openapi/llm/v1",
 )
 MODEL_ID = os.getenv("TASK_LLM_MODEL_ID", "")
 
@@ -73,10 +73,8 @@ def test_models():
     print("TEST: GET /v1/models (모델 목록 조회)")
     print("=" * 60)
 
-    url = f"{ENDPOINT}/models"
-    # ENDPOINT가 이미 /v1로 끝나는 경우와 아닌 경우 처리
-    if not ENDPOINT.endswith("/v1"):
-        url = f"{ENDPOINT}/v1/models"
+    # ENDPOINT는 /v1로 끝남 (예: .../openapi/llm/v1)
+    url = f"{ENDPOINT.rstrip('/')}/models"
 
     headers = {
         "x-fabrix-client": CLIENT_KEY,
@@ -133,9 +131,7 @@ def test_chat(stream: bool = False):
         print("  먼저 'python test_fabrix_api.py models'로 모델 ID를 확인하세요.")
         print()
 
-    url = f"{ENDPOINT}/chat/completions"
-    if not ENDPOINT.rstrip("/").endswith("/v1") and "/v1/" not in ENDPOINT:
-        url = f"{ENDPOINT}/v1/chat/completions"
+    url = f"{ENDPOINT.rstrip('/')}/chat/completions"
 
     headers = {
         "x-fabrix-client": CLIENT_KEY,

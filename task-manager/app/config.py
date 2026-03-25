@@ -27,7 +27,7 @@ DEFAULT_PORT = 8000
 # SDS LLM API settings
 LLM_ENDPOINT = os.getenv(
     "TASK_LLM_ENDPOINT",
-    "https://nsds-api.fabrix-s.samsungsds.com/sds/prod/api-llm/v1",
+    "https://nsds-api.fabrix-s.samsungsds.com/sds/prod/api-llm/openapi/llm/v1",
 )
 LLM_CLIENT_KEY = os.getenv("TASK_LLM_CLIENT_KEY", "")
 LLM_PASS_KEY = os.getenv("TASK_LLM_PASS_KEY", "")
