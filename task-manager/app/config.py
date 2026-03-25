@@ -25,10 +25,12 @@ DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
 
 # SDS LLM API settings
-LLM_ENDPOINT = os.getenv(
+# Base: .../openapi/llm  (models는 /v1/models, chat은 /chat/completions)
+LLM_ENDPOINT_BASE = os.getenv(
     "TASK_LLM_ENDPOINT",
-    "https://nsds-api.fabrix-s.samsungsds.com/sds/prod/api-llm/openapi/llm/v1",
+    "https://nsds-api.fabrix-s.samsungsds.com/sds/prod/api-llm/openapi/llm",
 )
+LLM_ENDPOINT = LLM_ENDPOINT_BASE  # backward compat
 LLM_CLIENT_KEY = os.getenv("TASK_LLM_CLIENT_KEY", "")
 LLM_PASS_KEY = os.getenv("TASK_LLM_PASS_KEY", "")
 LLM_MODEL = os.getenv("TASK_LLM_MODEL", "gpt-oss-120b")

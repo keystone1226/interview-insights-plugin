@@ -40,9 +40,10 @@ os.environ.pop("https_proxy", None)
 
 CLIENT_KEY = os.getenv("TASK_LLM_CLIENT_KEY", "")
 PASS_KEY = os.getenv("TASK_LLM_PASS_KEY", "")
-ENDPOINT = os.getenv(
+# Base path: .../openapi/llm (models는 /v1/models, chat은 /chat/completions)
+ENDPOINT_BASE = os.getenv(
     "TASK_LLM_ENDPOINT",
-    "https://nsds-api.fabrix-s.samsungsds.com/sds/prod/api-llm/openapi/llm/v1",
+    "https://nsds-api.fabrix-s.samsungsds.com/sds/prod/api-llm/openapi/llm",
 )
 MODEL_ID = os.getenv("TASK_LLM_MODEL_ID", "")
 
@@ -52,7 +53,7 @@ def check_config():
     print("=" * 60)
     print("설정 확인")
     print("=" * 60)
-    print(f"  ENDPOINT:   {ENDPOINT}")
+    print(f"  ENDPOINT:   {ENDPOINT_BASE}")
     print(f"  CLIENT_KEY: {CLIENT_KEY[:10]}..." if len(CLIENT_KEY) > 10 else f"  CLIENT_KEY: {CLIENT_KEY or '(미설정)'}")
     print(f"  PASS_KEY:   {PASS_KEY[:10]}..." if len(PASS_KEY) > 10 else f"  PASS_KEY:   {PASS_KEY or '(미설정)'}")
     print(f"  MODEL_ID:   {MODEL_ID or '(미설정 - models API로 먼저 조회하세요)'}")
@@ -73,8 +74,8 @@ def test_models():
     print("TEST: GET /v1/models (모델 목록 조회)")
     print("=" * 60)
 
-    # ENDPOINT는 /v1로 끝남 (예: .../openapi/llm/v1)
-    url = f"{ENDPOINT.rstrip('/')}/models"
+    # models는 /v1/models
+    url = f"{ENDPOINT_BASE.rstrip('/')}/v1/models"
 
     headers = {
         "x-fabrix-client": CLIENT_KEY,
@@ -131,7 +132,8 @@ def test_chat(stream: bool = False):
         print("  먼저 'python test_fabrix_api.py models'로 모델 ID를 확인하세요.")
         print()
 
-    url = f"{ENDPOINT.rstrip('/')}/chat/completions"
+    # chat은 /v1 없이 바로 /chat/completions
+    url = f"{ENDPOINT_BASE.rstrip('/')}/chat/completions"
 
     headers = {
         "x-fabrix-client": CLIENT_KEY,
