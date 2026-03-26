@@ -24,6 +24,7 @@ from app.config import DATABASE_URL
 from app.models import (
     BoardColumn,
     Comment,
+    Notification,
     ReportTemplate,
     Task,
     TaskHistory,
@@ -340,9 +341,13 @@ def main():
     print("Demo Data Seed")
     print("=" * 50)
 
+    # 테이블이 없으면 생성 (alembic 없이도 동작하도록)
+    print("\nDB 테이블 확인/생성 중...")
+    SQLModel.metadata.create_all(engine)
+
     # DB 초기화 (테이블 구조 유지, 데이터만 삭제)
     with Session(engine) as session:
-        print("\n기존 데이터 삭제 중...")
+        print("기존 데이터 삭제 중...")
         clear_all(session)
         print("데모 데이터 생성 중...")
         seed(session)
