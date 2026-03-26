@@ -11,6 +11,7 @@ from app.models import (
     ReportTemplate,
     ReportTemplateCreate,
     ReportTemplateRead,
+    Task,
     TaskHistory,
     TaskHistoryRead,
 )
@@ -211,10 +212,18 @@ async def generate_report(
             detail=f"최근 {days}일간 태스크 변동사항이 없습니다.",
         )
 
-    # Build changes summary
+    # Build changes summary — include task description for richer reports
+    task_ids = list({h.task_id for h in histories})
+    task_map = {}
+    for tid in task_ids:
+        t = session.get(Task, tid)
+        if t:
+            task_map[tid] = t
+
     task_changes = [
         {
             "task": h.task_title,
+            "description": (task_map[h.task_id].description or "") if h.task_id in task_map else "",
             "field": h.field_name,
             "from": h.old_value,
             "to": h.new_value,
