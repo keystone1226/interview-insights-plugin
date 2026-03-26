@@ -66,10 +66,11 @@ def run_migrations():
 
 
 def init_default_columns(session: Session):
-    """Create default board columns if none exist."""
+    """Create default board columns if none exist (for legacy no-workspace mode)."""
     from app.models import BoardColumn
 
-    existing = session.query(BoardColumn).first()
+    # Only create if there are no columns at all (legacy compat)
+    existing = session.query(BoardColumn).filter(BoardColumn.workspace_id.is_(None)).first()
     if existing:
         return
     defaults = [

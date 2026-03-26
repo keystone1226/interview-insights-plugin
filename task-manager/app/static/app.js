@@ -1,5 +1,6 @@
 /* ── State ──────────────────────────────────────── */
 let currentUser = null;
+let currentWorkspace = null;
 let allUsers = [];
 let columns = [];
 let tasks = [];
@@ -18,10 +19,11 @@ function tagColor(tag) {
 
 /* ── API helpers ────────────────────────────────── */
 async function api(path, opts = {}) {
-  const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...opts.headers },
-    ...opts,
-  });
+  const headers = { 'Content-Type': 'application/json', ...opts.headers };
+  if (currentWorkspace) {
+    headers['X-Workspace-Id'] = String(currentWorkspace.id);
+  }
+  const res = await fetch(path, { headers, ...opts });
   if (res.status === 204) return null;
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -51,7 +53,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!currentUser) {
     showNicknameModal();
   } else {
-    startApp();
+    // Check for saved workspace
+    const savedWs = localStorage.getItem('taskmanager_workspace');
+    if (savedWs) {
+      try {
+        currentWorkspace = JSON.parse(savedWs);
+        // Verify it still exists
+        const ws = await api(`/api/workspaces/${currentWorkspace.id}`);
+        currentWorkspace = ws;
+        localStorage.setItem('taskmanager_workspace', JSON.stringify(ws));
+        startApp();
+      } catch {
+        localStorage.removeItem('taskmanager_workspace');
+        currentWorkspace = null;
+        showWorkspaceModal();
+      }
+    } else {
+      showWorkspaceModal();
+    }
   }
 });
 
@@ -72,7 +91,7 @@ document.getElementById('nicknameSubmit').addEventListener('click', async () => 
     });
     localStorage.setItem('taskmanager_user', JSON.stringify(currentUser));
     document.getElementById('nicknameModal').classList.remove('active');
-    startApp();
+    showWorkspaceModal();
   } catch (e) {
     alert('Error: ' + e.message);
   }
@@ -82,10 +101,87 @@ document.getElementById('nicknameInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('nicknameSubmit').click();
 });
 
+/* ── Workspace Modal ────────────────────────────── */
+function showWorkspaceModal() {
+  document.getElementById('workspaceModal').classList.add('active');
+  loadWorkspaceList();
+}
+
+async function loadWorkspaceList() {
+  const list = document.getElementById('workspaceList');
+  try {
+    const workspaces = await api('/api/workspaces');
+    if (workspaces.length === 0) {
+      list.innerHTML = '<div class="workspace-empty">No workspaces yet. Create one below.</div>';
+    } else {
+      list.innerHTML = workspaces.map(ws => `
+        <div class="workspace-item" data-id="${ws.id}">
+          <div class="workspace-item-name">${escHtml(ws.name)}</div>
+          <div class="workspace-item-desc">${escHtml(ws.description || '')}</div>
+        </div>
+      `).join('');
+
+      list.querySelectorAll('.workspace-item').forEach(el => {
+        el.addEventListener('click', async () => {
+          const wsId = parseInt(el.dataset.id);
+          // Join workspace (idempotent)
+          await api(`/api/workspaces/${wsId}/join?user_id=${currentUser.id}`, { method: 'POST' });
+          const ws = await api(`/api/workspaces/${wsId}`);
+          currentWorkspace = ws;
+          localStorage.setItem('taskmanager_workspace', JSON.stringify(ws));
+          document.getElementById('workspaceModal').classList.remove('active');
+          startApp();
+        });
+      });
+    }
+  } catch (e) {
+    list.innerHTML = '<div class="workspace-empty">Error loading workspaces</div>';
+  }
+}
+
+document.getElementById('createWorkspaceBtn').addEventListener('click', async () => {
+  const name = document.getElementById('newWorkspaceName').value.trim();
+  if (!name) return;
+  try {
+    const ws = await api(`/api/workspaces?owner_id=${currentUser.id}`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+    currentWorkspace = ws;
+    localStorage.setItem('taskmanager_workspace', JSON.stringify(ws));
+    document.getElementById('workspaceModal').classList.remove('active');
+    document.getElementById('newWorkspaceName').value = '';
+    startApp();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+});
+
+document.getElementById('newWorkspaceName').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('createWorkspaceBtn').click();
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  localStorage.removeItem('taskmanager_user');
+  localStorage.removeItem('taskmanager_workspace');
+  currentUser = null;
+  currentWorkspace = null;
+  document.getElementById('workspaceModal').classList.remove('active');
+  showNicknameModal();
+});
+
+document.getElementById('switchWorkspaceBtn').addEventListener('click', () => {
+  showWorkspaceModal();
+});
+
 /* ── Start App ──────────────────────────────────── */
 async function startApp() {
   try {
     document.getElementById('currentUserName').textContent = currentUser.nickname;
+    if (currentWorkspace) {
+      document.getElementById('workspaceName').textContent = '/ ' + currentWorkspace.name;
+    }
+    document.getElementById('switchWorkspaceBtn').style.display = '';
     await Promise.all([loadColumns(), loadUsers()]);
     await loadTasks();
     console.log('Loaded columns:', columns.length, 'users:', allUsers.length, 'tasks:', tasks.length);
@@ -373,7 +469,9 @@ document.getElementById('taskForm').addEventListener('submit', async e => {
     if (imageInput.files.length > 0) {
       const formData = new FormData();
       formData.append('file', imageInput.files[0]);
-      await fetch(`/api/tasks/${savedTask.id}/image`, { method: 'POST', body: formData });
+      const imgHeaders = {};
+      if (currentWorkspace) imgHeaders['X-Workspace-Id'] = String(currentWorkspace.id);
+      await fetch(`/api/tasks/${savedTask.id}/image`, { method: 'POST', body: formData, headers: imgHeaders });
     }
 
     await loadTasks();

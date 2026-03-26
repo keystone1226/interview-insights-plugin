@@ -34,6 +34,7 @@ class User(UserBase, table=True):
     tasks: list["Task"] = Relationship(back_populates="assignee_user")
     comments: list["Comment"] = Relationship(back_populates="author")
     notifications: list["Notification"] = Relationship(back_populates="user")
+    workspace_members: list["WorkspaceMember"] = Relationship(back_populates="user")
 
 
 class UserCreate(UserBase):
@@ -42,6 +43,42 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: int
+    created_at: datetime
+
+
+# ── Workspace ─────────────────────────────────────────
+
+
+class Workspace(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(max_length=100, index=True)
+    description: Optional[str] = Field(default=None, max_length=500)
+    owner_id: int = Field(foreign_key="user.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    members: list["WorkspaceMember"] = Relationship(back_populates="workspace")
+
+
+class WorkspaceMember(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: int = Field(foreign_key="workspace.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
+
+    workspace: Optional[Workspace] = Relationship(back_populates="members")
+    user: Optional[User] = Relationship(back_populates="workspace_members")
+
+
+class WorkspaceCreate(SQLModel):
+    name: str
+    description: Optional[str] = None
+
+
+class WorkspaceRead(SQLModel):
+    id: int
+    name: str
+    description: Optional[str]
+    owner_id: int
     created_at: datetime
 
 
@@ -56,6 +93,7 @@ class BoardColumnBase(SQLModel):
 
 class BoardColumn(BoardColumnBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: Optional[int] = Field(default=None, foreign_key="workspace.id", index=True)
 
 
 class BoardColumnCreate(BoardColumnBase):
@@ -64,6 +102,7 @@ class BoardColumnCreate(BoardColumnBase):
 
 class BoardColumnRead(BoardColumnBase):
     id: int
+    workspace_id: Optional[int] = None
 
 
 class BoardColumnUpdate(SQLModel):
@@ -91,6 +130,7 @@ class TaskBase(SQLModel):
 
 class Task(TaskBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: Optional[int] = Field(default=None, foreign_key="workspace.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -204,6 +244,7 @@ class TaskHistory(SQLModel, table=True):
     old_value: Optional[str] = Field(default=None)
     new_value: Optional[str] = Field(default=None)
     changed_by_id: Optional[int] = Field(default=None)
+    workspace_id: Optional[int] = Field(default=None, foreign_key="workspace.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -215,6 +256,7 @@ class TaskHistoryRead(SQLModel):
     old_value: Optional[str]
     new_value: Optional[str]
     changed_by_id: Optional[int]
+    workspace_id: Optional[int] = None
     created_at: datetime
 
 
@@ -236,6 +278,7 @@ class ReportTemplate(SQLModel, table=True):
     name: str = Field(default="default", max_length=100)
     content: str  # The example report text
     system_prompt: str = Field(default=DEFAULT_SYSTEM_PROMPT)
+    workspace_id: Optional[int] = Field(default=None, foreign_key="workspace.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

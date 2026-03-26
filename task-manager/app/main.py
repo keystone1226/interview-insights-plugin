@@ -13,7 +13,7 @@ from sqlmodel import Session
 
 from app.config import DEFAULT_HOST, DEFAULT_PORT, UPLOAD_DIR
 from app.database import engine, init_default_columns, run_migrations
-from app.routers import columns, comments, notifications, reports, tasks, users
+from app.routers import columns, comments, notifications, reports, tasks, users, workspaces
 
 # Resolve static directory using Path for cross-platform compatibility
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -38,6 +38,7 @@ app = FastAPI(title="Task Manager", version="0.1.0", lifespan=lifespan)
 
 # Mount routers
 app.include_router(users.router)
+app.include_router(workspaces.router)
 app.include_router(tasks.router)
 app.include_router(comments.router)
 app.include_router(notifications.router)

@@ -11,6 +11,7 @@ from sqlmodel import Session, select
 
 from app.config import UPLOAD_DIR
 from app.database import get_session
+from app.deps import get_workspace_id
 from app.models import (
     Notification,
     NotificationType,
@@ -42,6 +43,7 @@ def _record_history(
         old_value=str(old_value) if old_value is not None else None,
         new_value=str(new_value) if new_value is not None else None,
         changed_by_id=changed_by_id,
+        workspace_id=task.workspace_id,
     )
     session.add(history)
 
@@ -79,8 +81,13 @@ def list_tasks(
     status: str | None = None,
     assignee_id: int | None = None,
     session: Session = Depends(get_session),
+    workspace_id: int | None = Depends(get_workspace_id),
 ):
     query = select(Task)
+    if workspace_id:
+        query = query.where(Task.workspace_id == workspace_id)
+    else:
+        query = query.where(Task.workspace_id.is_(None))
     if status:
         query = query.where(Task.status == status)
     if assignee_id:
@@ -90,8 +97,13 @@ def list_tasks(
 
 
 @router.post("", response_model=TaskRead, status_code=201)
-def create_task(data: TaskCreate, session: Session = Depends(get_session)):
+def create_task(
+    data: TaskCreate,
+    session: Session = Depends(get_session),
+    workspace_id: int | None = Depends(get_workspace_id),
+):
     task = Task.model_validate(data)
+    task.workspace_id = workspace_id
     task.created_at = datetime.utcnow()
     task.updated_at = datetime.utcnow()
     session.add(task)

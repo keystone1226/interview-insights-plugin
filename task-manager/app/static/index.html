@@ -9,8 +9,9 @@
 <body>
   <!-- Header -->
   <header class="header">
-    <h1>Task Manager</h1>
+    <h1>Task Manager <span id="workspaceName" style="font-weight:400;font-size:14px;color:var(--text-muted)"></span></h1>
     <div class="header-actions">
+      <button class="btn btn-sm btn-secondary" id="switchWorkspaceBtn" title="Switch Workspace" style="display:none">Switch Workspace</button>
       <button class="btn btn-sm btn-secondary" id="reportBtn" title="Weekly Report">Weekly Report</button>
       <button class="notification-bell" id="notifBell" title="Notifications">
         &#128276;
@@ -198,6 +199,22 @@
         <input type="email" id="emailInput" placeholder="Email (optional, for notifications)">
       </div>
       <button class="btn btn-primary" id="nicknameSubmit" style="width:100%">Start</button>
+    </div>
+  </div>
+
+  <!-- Workspace Modal -->
+  <div class="modal-overlay" id="workspaceModal">
+    <div class="modal workspace-modal">
+      <h2>Select Workspace</h2>
+      <p>Choose a workspace or create a new one</p>
+      <div id="workspaceList" class="workspace-list"></div>
+      <div class="workspace-create-row">
+        <input type="text" id="newWorkspaceName" placeholder="New workspace name" maxlength="100">
+        <button class="btn btn-primary btn-sm" id="createWorkspaceBtn">Create</button>
+      </div>
+      <div style="margin-top:12px;text-align:center">
+        <button class="btn btn-sm btn-secondary" id="logoutBtn">Change User</button>
+      </div>
     </div>
   </div>
 

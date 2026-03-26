@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from app.database import get_session
+from app.deps import get_workspace_id
 from app.models import (
     ReportTemplate,
     ReportTemplateCreate,
@@ -21,7 +22,7 @@ from app.services.llm import generate_weekly_report, is_llm_configured
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
-# ── LLM Health Check ────────────────────────────
+# ── LLM Health Check ────────────────────────────────
 
 
 @router.get("/llm-status")
@@ -105,16 +106,32 @@ async def llm_status():
 
 
 @router.get("/templates", response_model=list[ReportTemplateRead])
-def list_templates(session: Session = Depends(get_session)):
-    return session.exec(select(ReportTemplate).order_by(ReportTemplate.updated_at.desc())).all()
+def list_templates(
+    session: Session = Depends(get_session),
+    workspace_id: int | None = Depends(get_workspace_id),
+):
+    query = select(ReportTemplate).order_by(ReportTemplate.updated_at.desc())
+    if workspace_id:
+        query = query.where(ReportTemplate.workspace_id == workspace_id)
+    else:
+        query = query.where(ReportTemplate.workspace_id.is_(None))
+    return session.exec(query).all()
 
 
 @router.post("/templates", response_model=ReportTemplateRead, status_code=201)
-def create_template(data: ReportTemplateCreate, session: Session = Depends(get_session)):
-    # Upsert by name
-    existing = session.exec(
-        select(ReportTemplate).where(ReportTemplate.name == data.name)
-    ).first()
+def create_template(
+    data: ReportTemplateCreate,
+    session: Session = Depends(get_session),
+    workspace_id: int | None = Depends(get_workspace_id),
+):
+    # Upsert by name within workspace
+    query = select(ReportTemplate).where(ReportTemplate.name == data.name)
+    if workspace_id:
+        query = query.where(ReportTemplate.workspace_id == workspace_id)
+    else:
+        query = query.where(ReportTemplate.workspace_id.is_(None))
+    existing = session.exec(query).first()
+
     if existing:
         existing.content = data.content
         if data.system_prompt is not None:
@@ -126,6 +143,7 @@ def create_template(data: ReportTemplateCreate, session: Session = Depends(get_s
         return existing
 
     template = ReportTemplate.model_validate(data)
+    template.workspace_id = workspace_id
     template.created_at = datetime.utcnow()
     template.updated_at = datetime.utcnow()
     session.add(template)
@@ -150,22 +168,38 @@ def delete_template(template_id: int, session: Session = Depends(get_session)):
 def list_history(
     days: int = Query(default=7, ge=1, le=90),
     session: Session = Depends(get_session),
+    workspace_id: int | None = Depends(get_workspace_id),
 ):
     since = datetime.utcnow() - timedelta(days=days)
-    return session.exec(
+    query = (
         select(TaskHistory)
         .where(TaskHistory.created_at >= since)
         .order_by(TaskHistory.created_at.desc())
-    ).all()
+    )
+    if workspace_id:
+        query = query.where(TaskHistory.workspace_id == workspace_id)
+    else:
+        query = query.where(TaskHistory.workspace_id.is_(None))
+    return session.exec(query).all()
 
 
 # ── Clear History ────────────────────────────────
 
 
 @router.delete("/history", status_code=204)
-def clear_history(session: Session = Depends(get_session)):
-    """Delete all task change history records."""
-    session.exec(delete(TaskHistory))
+def clear_history(
+    session: Session = Depends(get_session),
+    workspace_id: int | None = Depends(get_workspace_id),
+):
+    """Delete task change history records for a workspace."""
+    if workspace_id:
+        histories = session.exec(
+            select(TaskHistory).where(TaskHistory.workspace_id == workspace_id)
+        ).all()
+        for h in histories:
+            session.delete(h)
+    else:
+        session.exec(delete(TaskHistory).where(TaskHistory.workspace_id.is_(None)))
     session.commit()
 
 
@@ -177,6 +211,7 @@ async def generate_report(
     template_id: Optional[int] = None,
     days: int = Query(default=7, ge=1, le=90),
     session: Session = Depends(get_session),
+    workspace_id: int | None = Depends(get_workspace_id),
 ):
     if not is_llm_configured():
         raise HTTPException(
@@ -188,9 +223,12 @@ async def generate_report(
     if template_id:
         template = session.get(ReportTemplate, template_id)
     else:
-        template = session.exec(
-            select(ReportTemplate).order_by(ReportTemplate.updated_at.desc())
-        ).first()
+        query = select(ReportTemplate).order_by(ReportTemplate.updated_at.desc())
+        if workspace_id:
+            query = query.where(ReportTemplate.workspace_id == workspace_id)
+        else:
+            query = query.where(ReportTemplate.workspace_id.is_(None))
+        template = session.exec(query).first()
 
     if not template:
         raise HTTPException(
@@ -200,11 +238,16 @@ async def generate_report(
 
     # Get task changes
     since = datetime.utcnow() - timedelta(days=days)
-    histories = session.exec(
+    history_query = (
         select(TaskHistory)
         .where(TaskHistory.created_at >= since)
         .order_by(TaskHistory.created_at)
-    ).all()
+    )
+    if workspace_id:
+        history_query = history_query.where(TaskHistory.workspace_id == workspace_id)
+    else:
+        history_query = history_query.where(TaskHistory.workspace_id.is_(None))
+    histories = session.exec(history_query).all()
 
     if not histories:
         raise HTTPException(
