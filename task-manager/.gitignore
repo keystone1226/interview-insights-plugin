@@ -6,3 +6,4 @@ tasks.db.*
 app/uploads/*
 !app/uploads/.gitkeep
 .env
+.staging/
