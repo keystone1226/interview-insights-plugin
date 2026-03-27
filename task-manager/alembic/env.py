@@ -6,7 +6,6 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-from app.config import DATABASE_URL
 from app.models import (  # noqa: F401 - ensure all models are registered
     BoardColumn,
     Comment,
@@ -15,10 +14,19 @@ from app.models import (  # noqa: F401 - ensure all models are registered
     Task,
     TaskHistory,
     User,
+    Workspace,
+    WorkspaceMember,
 )
 
 config = context.config
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+
+# Allow overriding sqlalchemy.url via -x flag (for sandbox testing)
+cmd_opts = context.get_x_argument(as_dictionary=True)
+if "sqlalchemy.url" in cmd_opts:
+    config.set_main_option("sqlalchemy.url", cmd_opts["sqlalchemy.url"])
+else:
+    from app.config import DATABASE_URL
+    config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name, disable_existing_loggers=False)
