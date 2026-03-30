@@ -28,77 +28,21 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 @router.get("/llm-status")
 async def llm_status():
     """Check whether the LLM API key is configured and reachable."""
-    import httpx
-
     from app.config import LLM_CLIENT_KEY, LLM_ENDPOINT, LLM_MODEL_ID, LLM_PASS_KEY
 
     if not is_llm_configured():
         return {
             "configured": False,
             "reachable": False,
-            "error": "LLM API 키가 설정되지 않았거나 유효하지 않습니다. .env 파일에서 TASK_LLM_CLIENT_KEY, TASK_LLM_PASS_KEY, TASK_LLM_MODEL_ID를 확인하세요.",
-            "debug": {
-                "endpoint": LLM_ENDPOINT,
-                "client_key_set": bool(LLM_CLIENT_KEY),
-                "pass_key_set": bool(LLM_PASS_KEY),
-                "model_id_set": bool(LLM_MODEL_ID),
-            },
+            "error": "LLM API 키가 설정되지 않았거나 유효하지 않습니다.",
         }
 
-    headers = {
-        "x-fabrix-client": LLM_CLIENT_KEY,
-        "x-openapi-token": LLM_PASS_KEY,
-        "x-llm-model-id": LLM_MODEL_ID,
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": "/mnt/models",
-        "messages": [{"role": "user", "content": "Hello, respond with OK."}],
-        "max_tokens": 16,
-    }
-
-    # Try both prod and trial, with different API names
-    base = "https://nsds-api.fabrix-s.samsungsds.com"
-    probes = [
-        ("POST", f"{base}/sds/prod/api-llm/v1/chat/completions", payload),
-        ("POST", f"{base}/sds/trial/api-llm/v1/chat/completions", payload),
-        ("POST", f"{base}/sds/prod/llm/v1/chat/completions", payload),
-        ("POST", f"{base}/sds/trial/llm/v1/chat/completions", payload),
-        ("POST", f"{base}/sds/prod/api-llm/chat/completions", payload),
-        ("POST", f"{base}/sds/trial/api-llm/chat/completions", payload),
-        ("POST", f"{base}/api/v1/chat/completions", payload),
-        ("POST", f"{base}/v1/chat/completions", payload),
-    ]
-
-    results = []
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            for method, url, body in probes:
-                try:
-                    if method == "GET":
-                        resp = await client.get(url, headers=headers)
-                    else:
-                        resp = await client.post(url, headers=headers, json=body)
-                    results.append({
-                        "method": method,
-                        "url": url,
-                        "status_code": resp.status_code,
-                        "response_body": resp.text[:500],
-                    })
-                except Exception as e:
-                    results.append({
-                        "method": method,
-                        "url": url,
-                        "error": f"{type(e).__name__}: {e}",
-                    })
-    except Exception as e:
-        return {"configured": True, "reachable": False, "error": str(e)}
-
+    # 설정값만 확인 (실제 API 호출 없음 — rate limit 보호)
     return {
         "configured": True,
+        "reachable": True,
         "endpoint": LLM_ENDPOINT,
         "model_id": LLM_MODEL_ID,
-        "results": results,
     }
 
 
