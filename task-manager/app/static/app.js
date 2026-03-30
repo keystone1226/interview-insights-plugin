@@ -994,6 +994,125 @@ document.getElementById('copyReportBtn').addEventListener('click', () => {
   });
 });
 
+/* ── Help Modal ────────────────────────────────── */
+document.getElementById('helpBtn').addEventListener('click', async () => {
+  const modal = document.getElementById('helpModal');
+  const content = document.getElementById('helpContent');
+  modal.classList.add('active');
+  content.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px">Loading...</div>';
+  try {
+    const res = await fetch('/api/help');
+    const md = await res.text();
+    content.innerHTML = renderMarkdown(md);
+  } catch (e) {
+    content.innerHTML = '<div style="color:var(--danger)">Failed to load help: ' + escHtml(e.message) + '</div>';
+  }
+});
+
+document.getElementById('closeHelpBtn').addEventListener('click', () => {
+  document.getElementById('helpModal').classList.remove('active');
+});
+
+document.getElementById('helpModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('helpModal').classList.remove('active');
+});
+
+function renderMarkdown(md) {
+  const lines = md.split('\n');
+  let html = '';
+  let inCodeBlock = false;
+  let codeBuffer = [];
+  let inList = false;
+  let listType = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Code block
+    if (line.startsWith('```')) {
+      if (inCodeBlock) {
+        html += '<pre><code>' + escHtml(codeBuffer.join('\n')) + '</code></pre>';
+        codeBuffer = [];
+        inCodeBlock = false;
+      } else {
+        if (inList) { html += listType === 'ul' ? '</ul>' : '</ol>'; inList = false; }
+        inCodeBlock = true;
+      }
+      continue;
+    }
+    if (inCodeBlock) {
+      codeBuffer.push(line);
+      continue;
+    }
+
+    // Close list if non-list line
+    if (inList && !line.match(/^(\s*[-*]|\s*\d+\.)\s/)) {
+      html += listType === 'ul' ? '</ul>' : '</ol>';
+      inList = false;
+    }
+
+    // Horizontal rule
+    if (line.match(/^---+$/)) {
+      html += '<hr>';
+      continue;
+    }
+
+    // Headings
+    const hMatch = line.match(/^(#{1,4})\s+(.*)/);
+    if (hMatch) {
+      const level = hMatch[1].length;
+      html += `<h${level}>${inlineFormat(hMatch[2])}</h${level}>`;
+      continue;
+    }
+
+    // Unordered list
+    const ulMatch = line.match(/^(\s*)[-*]\s+(.*)/);
+    if (ulMatch) {
+      if (!inList || listType !== 'ul') {
+        if (inList) html += listType === 'ul' ? '</ul>' : '</ol>';
+        html += '<ul>';
+        inList = true;
+        listType = 'ul';
+      }
+      html += `<li>${inlineFormat(ulMatch[2])}</li>`;
+      continue;
+    }
+
+    // Ordered list
+    const olMatch = line.match(/^\s*\d+\.\s+(.*)/);
+    if (olMatch) {
+      if (!inList || listType !== 'ol') {
+        if (inList) html += listType === 'ul' ? '</ul>' : '</ol>';
+        html += '<ol>';
+        inList = true;
+        listType = 'ol';
+      }
+      html += `<li>${inlineFormat(olMatch[1])}</li>`;
+      continue;
+    }
+
+    // Empty line
+    if (line.trim() === '') {
+      continue;
+    }
+
+    // Paragraph
+    html += `<p>${inlineFormat(line)}</p>`;
+  }
+
+  if (inList) html += listType === 'ul' ? '</ul>' : '</ol>';
+  if (inCodeBlock) html += '<pre><code>' + escHtml(codeBuffer.join('\n')) + '</code></pre>';
+  return html;
+}
+
+function inlineFormat(text) {
+  // Bold
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Inline code
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+  return text;
+}
+
 /* ── Close panels on outside click ──────────────── */
 document.addEventListener('click', e => {
   const bell = document.getElementById('notifBell');

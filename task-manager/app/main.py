@@ -8,15 +8,16 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from sqlmodel import Session
 
 from app.config import DEFAULT_HOST, DEFAULT_PORT, UPLOAD_DIR
 from app.database import engine, init_default_columns, run_migrations
 from app.routers import columns, comments, notifications, reports, tasks, users, workspaces
 
-# Resolve static directory using Path for cross-platform compatibility
+# Resolve directories using Path for cross-platform compatibility
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+README_PATH = Path(__file__).resolve().parent.parent / "README.md"
 
 
 @asynccontextmanager
@@ -72,6 +73,14 @@ async def serve_js():
 @app.get("/favicon.ico")
 async def favicon():
     return Response(status_code=204)
+
+
+@app.get("/api/help")
+async def serve_help():
+    """Serve README.md content for the in-app help modal."""
+    if README_PATH.exists():
+        return PlainTextResponse(README_PATH.read_text(encoding="utf-8"))
+    return PlainTextResponse("도움말 파일을 찾을 수 없습니다.", status_code=404)
 
 
 def get_local_ip() -> str:

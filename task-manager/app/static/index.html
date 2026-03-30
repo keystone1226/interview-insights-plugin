@@ -22,6 +22,7 @@
       <div class="user-info" id="userInfo">
         <span id="currentUserName">-</span>
       </div>
+      <button class="help-btn" id="helpBtn" title="Help">?</button>
     </div>
   </header>
 
@@ -235,6 +236,17 @@
         <button class="btn btn-secondary" id="deleteWsCancelBtn">Cancel</button>
         <button class="btn btn-danger" id="deleteWsConfirmBtn" disabled>Delete</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div class="modal-overlay" id="helpModal">
+    <div class="modal" style="max-width:760px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h2 style="margin-bottom:0">Help</h2>
+        <button class="btn btn-sm btn-secondary" id="closeHelpBtn">Close</button>
+      </div>
+      <div id="helpContent" class="help-content"></div>
     </div>
   </div>
 
