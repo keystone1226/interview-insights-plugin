@@ -574,6 +574,24 @@ body {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
 }
 
+.workspace-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.workspace-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.workspace-item-actions .btn {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
 .workspace-item-name {
   font-weight: 600;
   font-size: 15px;

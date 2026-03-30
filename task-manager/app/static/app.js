@@ -115,16 +115,23 @@ async function loadWorkspaceList() {
       list.innerHTML = '<div class="workspace-empty">No workspaces yet. Create one below.</div>';
     } else {
       list.innerHTML = workspaces.map(ws => `
-        <div class="workspace-item" data-id="${ws.id}">
-          <div class="workspace-item-name">${escHtml(ws.name)}</div>
-          <div class="workspace-item-desc">${escHtml(ws.description || '')}</div>
+        <div class="workspace-item" data-id="${ws.id}" data-name="${escHtml(ws.name)}">
+          <div class="workspace-item-top">
+            <div>
+              <div class="workspace-item-name">${escHtml(ws.name)}</div>
+              <div class="workspace-item-desc">${escHtml(ws.description || '')}</div>
+            </div>
+            <div class="workspace-item-actions" onclick="event.stopPropagation()">
+              <button class="btn btn-sm btn-secondary ws-backup-btn" data-id="${ws.id}" data-name="${escHtml(ws.name)}" title="Download Backup">Backup</button>
+              <button class="btn btn-sm btn-danger ws-delete-btn" data-id="${ws.id}" data-name="${escHtml(ws.name)}" title="Delete">Delete</button>
+            </div>
+          </div>
         </div>
       `).join('');
 
       list.querySelectorAll('.workspace-item').forEach(el => {
         el.addEventListener('click', async () => {
           const wsId = parseInt(el.dataset.id);
-          // Join workspace (idempotent)
           await api(`/api/workspaces/${wsId}/join?user_id=${currentUser.id}`, { method: 'POST' });
           const ws = await api(`/api/workspaces/${wsId}`);
           currentWorkspace = ws;
@@ -133,11 +140,161 @@ async function loadWorkspaceList() {
           startApp();
         });
       });
+
+      // Backup buttons
+      list.querySelectorAll('.ws-backup-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const wsId = btn.dataset.id;
+          const wsName = btn.dataset.name;
+          btn.textContent = '...';
+          btn.disabled = true;
+          try {
+            const res = await fetch(`/api/workspaces/${wsId}/backup`);
+            if (!res.ok) throw new Error('Backup failed');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${wsName.replace(/ /g, '_')}_backup_${new Date().toISOString().slice(0,10)}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (err) {
+            alert('Backup error: ' + err.message);
+          } finally {
+            btn.textContent = 'Backup';
+            btn.disabled = false;
+          }
+        });
+      });
+
+      // Delete buttons
+      list.querySelectorAll('.ws-delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openDeleteWsModal(parseInt(btn.dataset.id), btn.dataset.name);
+        });
+      });
     }
   } catch (e) {
     list.innerHTML = '<div class="workspace-empty">Error loading workspaces</div>';
   }
 }
+
+/* ── Delete Workspace Confirmation ─────────────── */
+let deleteWsTarget = null;
+
+function openDeleteWsModal(wsId, wsName) {
+  deleteWsTarget = { id: wsId, name: wsName };
+  document.getElementById('deleteWsTargetName').textContent = wsName;
+  document.getElementById('deleteWsConfirmInput').value = '';
+  document.getElementById('deleteWsConfirmBtn').disabled = true;
+  document.getElementById('deleteWsModal').classList.add('active');
+  document.getElementById('deleteWsConfirmInput').focus();
+}
+
+document.getElementById('deleteWsConfirmInput').addEventListener('input', () => {
+  const val = document.getElementById('deleteWsConfirmInput').value;
+  document.getElementById('deleteWsConfirmBtn').disabled = (val !== deleteWsTarget?.name);
+});
+
+document.getElementById('deleteWsCancelBtn').addEventListener('click', () => {
+  document.getElementById('deleteWsModal').classList.remove('active');
+  deleteWsTarget = null;
+});
+
+document.getElementById('deleteWsConfirmBtn').addEventListener('click', async () => {
+  if (!deleteWsTarget) return;
+  const confirmName = document.getElementById('deleteWsConfirmInput').value;
+  try {
+    await api(`/api/workspaces/${deleteWsTarget.id}?confirm_name=${encodeURIComponent(confirmName)}`, { method: 'DELETE' });
+    // If we deleted the current workspace, reset
+    if (currentWorkspace && currentWorkspace.id === deleteWsTarget.id) {
+      currentWorkspace = null;
+      localStorage.removeItem('taskmanager_workspace');
+    }
+    document.getElementById('deleteWsModal').classList.remove('active');
+    deleteWsTarget = null;
+    loadWorkspaceList();
+  } catch (err) {
+    alert('Delete error: ' + err.message);
+  }
+});
+
+document.getElementById('deleteWsModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) {
+    document.getElementById('deleteWsModal').classList.remove('active');
+    deleteWsTarget = null;
+  }
+});
+
+/* ── Restore Backup ────────────────────────────── */
+document.getElementById('restoreBackupBtn').addEventListener('click', () => {
+  document.getElementById('restoreFileInput').click();
+});
+
+document.getElementById('restoreFileInput').addEventListener('change', async () => {
+  const fileInput = document.getElementById('restoreFileInput');
+  if (!fileInput.files.length) return;
+  const file = fileInput.files[0];
+
+  // Read file to check workspace name
+  const text = await file.text();
+  const metaMatch = text.match(/<!-- BACKUP_META\s*([\s\S]*?)\s*BACKUP_META -->/);
+  let wsName = file.name;
+  let existingWarning = '';
+  if (metaMatch) {
+    try {
+      const meta = JSON.parse(metaMatch[1]);
+      wsName = meta.workspace_name || wsName;
+    } catch {}
+  }
+
+  // Check if workspace exists
+  try {
+    const workspaces = await api('/api/workspaces');
+    const existing = workspaces.find(w => w.name === wsName);
+    if (existing) {
+      existingWarning = `\n\n[WARNING] Workspace "${wsName}" already exists. All existing data will be overwritten!`;
+    }
+  } catch {}
+
+  const confirmed = confirm(
+    `Restore workspace from backup file?\n\nFile: ${file.name}\nWorkspace: ${wsName}${existingWarning}\n\nContinue?`
+  );
+  if (!confirmed) {
+    fileInput.value = '';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch(`/api/workspaces/restore?owner_id=${currentUser.id}`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Restore failed');
+    }
+    const result = await res.json();
+    alert(`Restore complete: ${result.workspace_name}`);
+
+    // Switch to restored workspace
+    const ws = await api(`/api/workspaces/${result.workspace_id}`);
+    await api(`/api/workspaces/${result.workspace_id}/join?user_id=${currentUser.id}`, { method: 'POST' });
+    currentWorkspace = ws;
+    localStorage.setItem('taskmanager_workspace', JSON.stringify(ws));
+    document.getElementById('workspaceModal').classList.remove('active');
+    startApp();
+  } catch (err) {
+    alert('Restore error: ' + err.message);
+  } finally {
+    fileInput.value = '';
+  }
+});
 
 document.getElementById('createWorkspaceBtn').addEventListener('click', async () => {
   const name = document.getElementById('newWorkspaceName').value.trim();
@@ -182,6 +339,7 @@ async function startApp() {
       document.getElementById('workspaceName').textContent = '/ ' + currentWorkspace.name;
     }
     document.getElementById('switchWorkspaceBtn').style.display = '';
+    document.getElementById('restoreBackupBtn').style.display = '';
     await Promise.all([loadColumns(), loadUsers()]);
     await loadTasks();
     console.log('Loaded columns:', columns.length, 'users:', allUsers.length, 'tasks:', tasks.length);
@@ -638,11 +796,27 @@ function timeAgo(dateStr) {
 }
 
 /* ── Weekly Report ─────────────────────────────── */
+const DEFAULT_SYSTEM_PROMPT = `당신은 UX디자인팀의 주간보고서를 작성하는 어시스턴트입니다.
+
+규칙:
+1. 마크다운 문법(#, *, **, \`\`\`, | 등)을 절대 사용하지 마세요. 일반 텍스트로만 작성하세요.
+2. 예시 보고서는 형식과 구조만 참고하세요. 예시의 내용(텍스트)을 그대로 복사하거나 포함하지 마세요.
+3. 오직 태스크 변동사항의 description과 상태 변화만을 근거로 새로운 내용을 작성하세요.
+4. 한국어 경어체로 작성하세요.
+5. 각 태스크의 description을 활용하여 구체적으로 무엇을 완료/진행했는지 서술하세요.
+6. DONE으로 변경된 항목은 description 기반으로 완료 내용을 요약하세요.
+7. TODO/BACKLOG 항목은 '다음 주 계획'에 반영하세요.`;
+
 document.getElementById('reportBtn').addEventListener('click', () => {
   document.getElementById('reportModal').classList.add('active');
   document.getElementById('reportResultGroup').style.display = 'none';
   document.getElementById('changesPreviewGroup').style.display = 'none';
   document.getElementById('reportLoading').style.display = 'none';
+  // Set default system prompt if empty
+  const sysPromptEl = document.getElementById('systemPrompt');
+  if (!sysPromptEl.value.trim()) {
+    sysPromptEl.value = DEFAULT_SYSTEM_PROMPT;
+  }
   checkLlmStatus();
   loadChangesPreview();
 });

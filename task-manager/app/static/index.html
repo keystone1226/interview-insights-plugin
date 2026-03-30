@@ -11,6 +11,8 @@
   <header class="header">
     <h1>Task Manager <span id="workspaceName" style="font-weight:400;font-size:14px;color:var(--text-muted)"></span></h1>
     <div class="header-actions">
+      <button class="btn btn-sm btn-secondary" id="restoreBackupBtn" title="Restore Backup" style="display:none">Restore Backup</button>
+      <input type="file" id="restoreFileInput" accept=".md" style="display:none">
       <button class="btn btn-sm btn-secondary" id="switchWorkspaceBtn" title="Switch Workspace" style="display:none">Switch Workspace</button>
       <button class="btn btn-sm btn-secondary" id="reportBtn" title="Weekly Report">Weekly Report</button>
       <button class="notification-bell" id="notifBell" title="Notifications">
@@ -214,6 +216,24 @@
       </div>
       <div style="margin-top:12px;text-align:center">
         <button class="btn btn-sm btn-secondary" id="logoutBtn">Change User</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Workspace Confirmation Modal -->
+  <div class="modal-overlay" id="deleteWsModal">
+    <div class="modal" style="max-width:400px;text-align:center">
+      <h2 style="color:var(--danger)">Delete Workspace</h2>
+      <p style="color:var(--text-muted);margin-bottom:16px">
+        This will permanently delete all tasks, history, and templates in this workspace.
+      </p>
+      <p style="margin-bottom:12px">Type <strong id="deleteWsTargetName"></strong> to confirm:</p>
+      <div class="form-group">
+        <input type="text" id="deleteWsConfirmInput" placeholder="Workspace name" autocomplete="off">
+      </div>
+      <div class="form-actions" style="justify-content:center">
+        <button class="btn btn-secondary" id="deleteWsCancelBtn">Cancel</button>
+        <button class="btn btn-danger" id="deleteWsConfirmBtn" disabled>Delete</button>
       </div>
     </div>
   </div>
