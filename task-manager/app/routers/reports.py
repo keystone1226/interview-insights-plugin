@@ -286,7 +286,7 @@ async def generate_report(
             period_label=period_label,
             system_prompt=template.system_prompt,
         )
-    except (RuntimeError, UnicodeEncodeError) as e:
+    except Exception as e:
         detail = str(e)
         if isinstance(e, UnicodeEncodeError):
             detail = "API 키에 유효하지 않은 문자가 포함되어 있습니다. .env 파일에서 실제 API 키를 입력하세요."

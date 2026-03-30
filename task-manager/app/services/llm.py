@@ -72,7 +72,10 @@ async def chat_completion(
     except httpx.TimeoutException:
         raise RuntimeError("LLM API 요청 시간이 초과되었습니다.")
     except httpx.HTTPStatusError as e:
-        raise RuntimeError(f"LLM API 오류 (HTTP {e.response.status_code})")
+        body = e.response.text[:500]
+        raise RuntimeError(f"LLM API 오류 (HTTP {e.response.status_code}): {body}")
+    except Exception as e:
+        raise RuntimeError(f"LLM API 호출 중 예외 발생: {type(e).__name__}: {e}")
 
     # OpenAI-compatible response format
     try:
