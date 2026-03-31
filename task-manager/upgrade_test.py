@@ -263,11 +263,15 @@ def run_staging_server(db_path: Path, port: int):
         print(f"기존 DB 없음 → 신규 설치 모드")
         is_fresh = True
 
-    # uploads 디렉토리 심볼릭 링크 (이미지 공유)
+    # uploads 디렉토리 공유 (symlink 또는 복사)
     staging_uploads = staging_dir / "uploads"
     real_uploads = BASE_DIR / "app" / "uploads"
     if real_uploads.exists() and not staging_uploads.exists():
-        staging_uploads.symlink_to(real_uploads)
+        try:
+            staging_uploads.symlink_to(real_uploads)
+        except OSError:
+            # Windows에서 symlink 권한이 없는 경우 복사로 대체
+            shutil.copytree(real_uploads, staging_uploads)
 
     # ── 검증 실행 ────────────────────────────────
     print()

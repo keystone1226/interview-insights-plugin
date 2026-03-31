@@ -8,8 +8,8 @@
 
 ```bash
 cd task-manager
-uv sync                        # 의존성 설치
-uv run python -m app           # 서버 실행 (기본 포트 8000)
+pip install -r requirements.txt   # 최초 1회 (또는 uv sync)
+python -m app                     # 서버 실행 (기본 포트 8000)
 ```
 
 서버가 시작되면 아래와 같이 출력됩니다:
@@ -30,7 +30,7 @@ uv run python -m app           # 서버 실행 (기본 포트 8000)
 ### 포트 변경
 
 ```bash
-uv run python -m app --port 9000
+python -m app --port 9000
 ```
 
 ---
@@ -183,7 +183,7 @@ export TASK_SMTP_PASSWORD=
 - SQLite 파일: `tasks.db` (자동 생성)
 - 마이그레이션: Alembic 사용, 서버 시작 시 자동 적용
 - 백업: 마이그레이션 전 자동 백업 (`tasks.db.bak.{timestamp}`)
-- 수동 롤백: `uv run alembic downgrade -1`
+- 수동 롤백: `python -m alembic downgrade -1`
 
 ---
 
