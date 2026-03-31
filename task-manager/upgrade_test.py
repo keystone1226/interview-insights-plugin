@@ -315,29 +315,26 @@ def run_staging_server(db_path: Path, port: int):
     # We need to override DATABASE_URL at the module level.
     # The cleanest way: write a small wrapper script that patches config before import.
     wrapper = staging_dir / "_staging_run.py"
-    wrapper.write_text(f'''
-"""Staging server wrapper."""
+    # Use repr() for paths to avoid Windows backslash escape issues
+    base_dir_repr = repr(str(BASE_DIR))
+    staging_db_repr = repr(str(staging_db))
+    staging_db_url = str(staging_db).replace("\\", "/")
+    wrapper.write_text(f'''"""Staging server wrapper."""
 import sys
 import os
 
-# Ensure app package is importable
-sys.path.insert(0, "{BASE_DIR}")
+sys.path.insert(0, {base_dir_repr})
+os.environ["_STAGING_DB"] = {staging_db_repr}
 
-# Override DB path before any app module is imported
-os.environ["_STAGING_DB"] = "{staging_db}"
-
-# Patch app.config at import time
 import app.config as cfg
 from pathlib import Path
-cfg.DB_PATH = Path("{staging_db}")
-cfg.DATABASE_URL = "sqlite:///{staging_db}"
+cfg.DB_PATH = Path({staging_db_repr})
+cfg.DATABASE_URL = "sqlite:///{staging_db_url}"
 
-# Now import and configure the engine
 import app.database as db
 from sqlmodel import create_engine
 db.engine = create_engine(cfg.DATABASE_URL, echo=False)
 
-# Import the app
 from app.main import app
 
 if __name__ == "__main__":
