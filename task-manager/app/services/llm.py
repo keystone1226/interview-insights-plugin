@@ -57,9 +57,15 @@ async def chat_completion(
     }
 
     try:
+        # Endpoint 경로 보정: /openapi/llm 없이 /api-llm까지만 설정된 경우 자동 추가
+        endpoint = LLM_ENDPOINT.rstrip("/")
+        if endpoint.endswith("/api-llm"):
+            endpoint += "/openapi/llm"
+        url = f"{endpoint}/chat/completions"
+
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
-                f"{LLM_ENDPOINT}/chat/completions",
+                url,
                 headers=headers,
                 json=payload,
             )
