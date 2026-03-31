@@ -316,7 +316,7 @@ def run_staging_server(db_path: Path, port: int):
     # The cleanest way: write a small wrapper script that patches config before import.
     wrapper = staging_dir / "_staging_run.py"
     wrapper.write_text(f'''
-"""Staging server wrapper — overrides DB path before app loads."""
+"""Staging server wrapper."""
 import sys
 import os
 
@@ -343,7 +343,7 @@ from app.main import app
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port={port})
-''')
+''', encoding="utf-8")
 
     try:
         proc = subprocess.Popen(
