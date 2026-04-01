@@ -238,7 +238,28 @@ document.getElementById('restoreFileInput').addEventListener('change', async () 
   if (!fileInput.files.length) return;
   const file = fileInput.files[0];
 
-  // Read file to check workspace name
+  // .db file → DB file restore
+  if (file.name.endsWith('.db')) {
+    const confirmed = confirm(
+      `DB 파일을 업로드하면 현재 모든 데이터가 교체됩니다.\n\n` +
+      `파일: ${file.name} (${(file.size / 1024).toFixed(1)} KB)\n\n` +
+      `기존 DB는 자동 백업됩니다.\n업로드 후 서버 재시작이 필요합니다.\n\n계속하시겠습니까?`
+    );
+    if (!confirmed) { fileInput.value = ''; return; }
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/backup/db', { method: 'POST', body: formData });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.detail || 'Upload failed');
+      alert(`${result.message}\n\n서버 관리자에게 재시작을 요청하세요.`);
+    } catch (err) {
+      alert('DB restore error: ' + err.message);
+    } finally { fileInput.value = ''; }
+    return;
+  }
+
+  // .md file → Workspace markdown restore
   const text = await file.text();
   const metaMatch = text.match(/<!-- BACKUP_META\s*([\s\S]*?)\s*BACKUP_META -->/);
   let wsName = file.name;
@@ -250,7 +271,6 @@ document.getElementById('restoreFileInput').addEventListener('change', async () 
     } catch {}
   }
 
-  // Check if workspace exists
   try {
     const workspaces = await api('/api/workspaces');
     const existing = workspaces.find(w => w.name === wsName);
@@ -262,10 +282,7 @@ document.getElementById('restoreFileInput').addEventListener('change', async () 
   const confirmed = confirm(
     `Restore workspace from backup file?\n\nFile: ${file.name}\nWorkspace: ${wsName}${existingWarning}\n\nContinue?`
   );
-  if (!confirmed) {
-    fileInput.value = '';
-    return;
-  }
+  if (!confirmed) { fileInput.value = ''; return; }
 
   const formData = new FormData();
   formData.append('file', file);
@@ -282,7 +299,6 @@ document.getElementById('restoreFileInput').addEventListener('change', async () 
     const result = await res.json();
     alert(`Restore complete: ${result.workspace_name}`);
 
-    // Switch to restored workspace
     const ws = await api(`/api/workspaces/${result.workspace_id}`);
     await api(`/api/workspaces/${result.workspace_id}/join?user_id=${currentUser.id}`, { method: 'POST' });
     currentWorkspace = ws;
@@ -316,6 +332,62 @@ document.getElementById('createWorkspaceBtn').addEventListener('click', async ()
 
 document.getElementById('newWorkspaceName').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('createWorkspaceBtn').click();
+});
+
+/* ── DB File Backup / Restore ──────────────────── */
+document.getElementById('downloadDbBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('downloadDbBtn');
+  btn.textContent = '...';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/backup/db');
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tasks_backup_${new Date().toISOString().slice(0,10)}.db`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('DB download error: ' + err.message);
+  } finally {
+    btn.textContent = 'Download DB';
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('uploadDbBtn').addEventListener('click', () => {
+  document.getElementById('dbFileInput').click();
+});
+
+document.getElementById('dbFileInput').addEventListener('change', async () => {
+  const fileInput = document.getElementById('dbFileInput');
+  if (!fileInput.files.length) return;
+  const file = fileInput.files[0];
+
+  const confirmed = confirm(
+    `DB 파일을 업로드하면 현재 모든 데이터가 교체됩니다.\n\n` +
+    `파일: ${file.name} (${(file.size / 1024).toFixed(1)} KB)\n\n` +
+    `기존 DB는 자동 백업됩니다.\n업로드 후 서버 재시작이 필요합니다.\n\n계속하시겠습니까?`
+  );
+  if (!confirmed) {
+    fileInput.value = '';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/backup/db', { method: 'POST', body: formData });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.detail || 'Upload failed');
+    alert(`${result.message}\n\n서버 관리자에게 재시작을 요청하세요.`);
+  } catch (err) {
+    alert('DB upload error: ' + err.message);
+  } finally {
+    fileInput.value = '';
+  }
 });
 
 document.getElementById('logoutBtn').addEventListener('click', () => {

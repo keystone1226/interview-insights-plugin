@@ -1,17 +1,18 @@
 """FastAPI application entry point."""
 
 import argparse
+import shutil
 import socket
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, PlainTextResponse, Response
-from sqlmodel import Session
 
-from app.config import DEFAULT_HOST, DEFAULT_PORT, UPLOAD_DIR
+from app.config import DB_PATH, DEFAULT_HOST, DEFAULT_PORT, UPLOAD_DIR
 from app.database import engine, init_default_columns, run_migrations
 from app.routers import columns, comments, notifications, reports, tasks, users, workspaces
 
@@ -81,6 +82,57 @@ async def serve_help():
     if README_PATH.exists():
         return PlainTextResponse(README_PATH.read_text(encoding="utf-8"))
     return PlainTextResponse("도움말 파일을 찾을 수 없습니다.", status_code=404)
+
+
+# ── DB File Backup / Restore ────────────────────
+
+
+@app.get("/api/backup/db")
+async def download_db():
+    """Download the raw SQLite DB file."""
+    if not DB_PATH.exists():
+        return Response(status_code=404)
+    filename = f"tasks_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    return FileResponse(
+        DB_PATH,
+        media_type="application/octet-stream",
+        filename=filename,
+    )
+
+
+@app.post("/api/backup/db")
+async def upload_db(file: UploadFile = File(...)):
+    """Upload a SQLite DB file to replace the current one.
+
+    Creates a backup of the current DB before overwriting.
+    The server must be restarted after this operation.
+    """
+    # Validate: must be a SQLite file
+    header = await file.read(16)
+    await file.seek(0)
+    if header[:6] != b"SQLite":
+        return Response(
+            status_code=400,
+            content='{"detail":"유효한 SQLite 파일이 아닙니다."}',
+            media_type="application/json",
+        )
+
+    # Backup current DB
+    if DB_PATH.exists():
+        backup_name = DB_PATH.with_suffix(
+            f".db.before_restore.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
+        shutil.copy2(DB_PATH, backup_name)
+
+    # Write uploaded file
+    content = await file.read()
+    DB_PATH.write_bytes(content)
+
+    return {
+        "ok": True,
+        "message": "DB 파일 복원 완료. 서버를 재시작하세요.",
+        "size": len(content),
+    }
 
 
 def get_local_ip() -> str:

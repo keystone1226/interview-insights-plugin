@@ -12,7 +12,7 @@
     <h1>Task Manager <span id="workspaceName" style="font-weight:400;font-size:14px;color:var(--text-muted)"></span></h1>
     <div class="header-actions">
       <button class="btn btn-sm btn-secondary" id="restoreBackupBtn" title="Restore Backup" style="display:none">Restore Backup</button>
-      <input type="file" id="restoreFileInput" accept=".md" style="display:none">
+      <input type="file" id="restoreFileInput" accept=".md,.db" style="display:none">
       <button class="btn btn-sm btn-secondary" id="switchWorkspaceBtn" title="Switch Workspace" style="display:none">Switch Workspace</button>
       <button class="btn btn-sm btn-secondary" id="reportBtn" title="Weekly Report">Weekly Report</button>
       <button class="notification-bell" id="notifBell" title="Notifications">
@@ -214,6 +214,14 @@
       <div class="workspace-create-row">
         <input type="text" id="newWorkspaceName" placeholder="New workspace name" maxlength="100">
         <button class="btn btn-primary btn-sm" id="createWorkspaceBtn">Create</button>
+      </div>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-align:center">Full Database Backup</div>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="btn btn-sm btn-secondary" id="downloadDbBtn">Download DB</button>
+          <button class="btn btn-sm btn-secondary" id="uploadDbBtn">Upload DB</button>
+          <input type="file" id="dbFileInput" accept=".db" style="display:none">
+        </div>
       </div>
       <div style="margin-top:12px;text-align:center">
         <button class="btn btn-sm btn-secondary" id="logoutBtn">Change User</button>
