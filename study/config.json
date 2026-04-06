@@ -1,0 +1,36 @@
+{
+  "study_name": "AI Agent 트렌드 스터디",
+  "total_weeks": 8,
+  "current_week": 1,
+
+  "schedule": {
+    "day": "TBD",
+    "time": "TBD",
+    "timezone": "Asia/Seoul",
+    "reminder_hours_before": 24
+  },
+
+  "members": [
+    {
+      "github": "TBD",
+      "slack": "TBD",
+      "name": "멤버1"
+    }
+  ],
+
+  "slack": {
+    "channel": "TBD",
+    "bot_name": "스터디봇"
+  },
+
+  "weekly_topics": {
+    "week01": { "topic": "OT & AI Agent 개요", "presenter": "TBD" },
+    "week02": { "topic": "TBD", "presenter": "TBD" },
+    "week03": { "topic": "TBD", "presenter": "TBD" },
+    "week04": { "topic": "TBD", "presenter": "TBD" },
+    "week05": { "topic": "TBD", "presenter": "TBD" },
+    "week06": { "topic": "TBD", "presenter": "TBD" },
+    "week07": { "topic": "TBD", "presenter": "TBD" },
+    "week08": { "topic": "TBD", "presenter": "TBD" }
+  }
+}
