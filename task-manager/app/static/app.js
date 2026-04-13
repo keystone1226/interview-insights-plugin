@@ -62,6 +62,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         const ws = await api(`/api/workspaces/${currentWorkspace.id}`);
         currentWorkspace = ws;
         localStorage.setItem('taskmanager_workspace', JSON.stringify(ws));
+
+        // If the workspace is now password-protected and we don't
+        // have a cached unlock for this browser session, re-prompt.
+        if (ws.has_password) {
+          const cached = sessionStorage.getItem(`taskmanager_ws_unlocked_${ws.id}`);
+          if (!cached) {
+            const pw = await promptWorkspaceUnlock(ws.id, ws.name);
+            if (!pw) {
+              currentWorkspace = null;
+              localStorage.removeItem('taskmanager_workspace');
+              showWorkspaceModal();
+              return;
+            }
+          }
+        }
         startApp();
       } catch {
         localStorage.removeItem('taskmanager_workspace');
@@ -114,30 +129,76 @@ async function loadWorkspaceList() {
     if (workspaces.length === 0) {
       list.innerHTML = '<div class="workspace-empty">No workspaces yet. Create one below.</div>';
     } else {
-      list.innerHTML = workspaces.map(ws => `
-        <div class="workspace-item" data-id="${ws.id}" data-name="${escHtml(ws.name)}">
+      list.innerHTML = workspaces.map(ws => {
+        const lockBadge = ws.has_password
+          ? '<span class="ws-lock-badge" title="Password protected">&#128274;</span>'
+          : '';
+        const pwLabel = ws.has_password ? 'Password' : 'Lock';
+        return `
+        <div class="workspace-item" data-id="${ws.id}" data-name="${escHtml(ws.name)}" data-has-password="${ws.has_password ? '1' : '0'}">
           <div class="workspace-item-top">
             <div>
-              <div class="workspace-item-name">${escHtml(ws.name)}</div>
+              <div class="workspace-item-name">${lockBadge}${escHtml(ws.name)}</div>
               <div class="workspace-item-desc">${escHtml(ws.description || '')}</div>
             </div>
             <div class="workspace-item-actions" onclick="event.stopPropagation()">
+              <button class="btn btn-sm btn-secondary ws-password-btn" data-id="${ws.id}" data-name="${escHtml(ws.name)}" data-has-password="${ws.has_password ? '1' : '0'}" title="Set / change password">${pwLabel}</button>
               <button class="btn btn-sm btn-secondary ws-backup-btn" data-id="${ws.id}" data-name="${escHtml(ws.name)}" title="Download Backup">Backup</button>
               <button class="btn btn-sm btn-danger ws-delete-btn" data-id="${ws.id}" data-name="${escHtml(ws.name)}" title="Delete">Delete</button>
             </div>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       list.querySelectorAll('.workspace-item').forEach(el => {
         el.addEventListener('click', async () => {
           const wsId = parseInt(el.dataset.id);
-          await api(`/api/workspaces/${wsId}/join?user_id=${currentUser.id}`, { method: 'POST' });
+          const hasPassword = el.dataset.hasPassword === '1';
+          const wsName = el.dataset.name;
+          let password = null;
+
+          if (hasPassword) {
+            // Skip the unlock prompt if we've already verified this workspace
+            // in the current browser session.
+            const cached = sessionStorage.getItem(`taskmanager_ws_unlocked_${wsId}`);
+            if (cached) {
+              password = cached;
+            } else {
+              password = await promptWorkspaceUnlock(wsId, wsName);
+              if (!password) return; // user cancelled
+            }
+          }
+
+          try {
+            const joinUrl = `/api/workspaces/${wsId}/join?user_id=${currentUser.id}` +
+              (password ? `&password=${encodeURIComponent(password)}` : '');
+            await api(joinUrl, { method: 'POST' });
+          } catch (err) {
+            if (hasPassword) {
+              // Cached password was wrong (e.g. password changed elsewhere)
+              sessionStorage.removeItem(`taskmanager_ws_unlocked_${wsId}`);
+            }
+            alert('Workspace join failed: ' + err.message);
+            return;
+          }
           const ws = await api(`/api/workspaces/${wsId}`);
           currentWorkspace = ws;
           localStorage.setItem('taskmanager_workspace', JSON.stringify(ws));
           document.getElementById('workspaceModal').classList.remove('active');
           startApp();
+        });
+      });
+
+      // Password buttons
+      list.querySelectorAll('.ws-password-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openWsPasswordModal(
+            parseInt(btn.dataset.id),
+            btn.dataset.name,
+            btn.dataset.hasPassword === '1',
+          );
         });
       });
 
@@ -181,6 +242,114 @@ async function loadWorkspaceList() {
   }
 }
 
+/* ── Workspace Password: Set / Change / Clear ──── */
+let wsPasswordTarget = null;
+
+function openWsPasswordModal(wsId, wsName, hasPassword) {
+  wsPasswordTarget = { id: wsId, name: wsName, hasPassword };
+  document.getElementById('wsPasswordTitle').textContent = hasPassword
+    ? `Change Password — ${wsName}`
+    : `Set Password — ${wsName}`;
+  document.getElementById('wsPasswordSubtitle').textContent = hasPassword
+    ? '현재 비밀번호를 입력한 뒤, 새 비밀번호를 설정하거나 비워서 해제하세요.'
+    : '워크스페이스에 접근할 때 입력해야 하는 비밀번호를 설정합니다.';
+  document.getElementById('wsPasswordCurrentGroup').style.display = hasPassword ? 'block' : 'none';
+  document.getElementById('wsPasswordCurrent').value = '';
+  document.getElementById('wsPasswordNew').value = '';
+  document.getElementById('wsPasswordModal').classList.add('active');
+  setTimeout(() => {
+    (hasPassword
+      ? document.getElementById('wsPasswordCurrent')
+      : document.getElementById('wsPasswordNew')
+    ).focus();
+  }, 50);
+}
+
+function closeWsPasswordModal() {
+  document.getElementById('wsPasswordModal').classList.remove('active');
+  wsPasswordTarget = null;
+}
+
+document.getElementById('wsPasswordCancelBtn').addEventListener('click', closeWsPasswordModal);
+
+document.getElementById('wsPasswordSaveBtn').addEventListener('click', async () => {
+  if (!wsPasswordTarget) return;
+  const { id, hasPassword } = wsPasswordTarget;
+  const current = document.getElementById('wsPasswordCurrent').value;
+  const next = document.getElementById('wsPasswordNew').value;
+  try {
+    const res = await api(`/api/workspaces/${id}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        current_password: hasPassword ? current : null,
+        new_password: next || null,
+      }),
+    });
+    alert(res.message || 'Saved.');
+    // Clear any cached unlock state for this workspace — it may be stale now.
+    sessionStorage.removeItem(`taskmanager_ws_unlocked_${id}`);
+    closeWsPasswordModal();
+    loadWorkspaceList();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+});
+
+document.getElementById('wsPasswordNew').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('wsPasswordSaveBtn').click();
+});
+
+/* ── Workspace Unlock Prompt ──────────────────── */
+let wsUnlockResolver = null;
+
+function promptWorkspaceUnlock(wsId, wsName) {
+  document.getElementById('wsUnlockName').textContent = wsName;
+  document.getElementById('wsUnlockInput').value = '';
+  document.getElementById('wsUnlockError').style.display = 'none';
+  document.getElementById('wsUnlockModal').classList.add('active');
+  setTimeout(() => document.getElementById('wsUnlockInput').focus(), 50);
+  return new Promise(resolve => {
+    wsUnlockResolver = async (password) => {
+      if (password === null) {
+        document.getElementById('wsUnlockModal').classList.remove('active');
+        wsUnlockResolver = null;
+        resolve(null);
+        return;
+      }
+      // Verify against server before accepting.
+      try {
+        await api(`/api/workspaces/${wsId}/verify-password`, {
+          method: 'POST',
+          body: JSON.stringify({ password }),
+        });
+        sessionStorage.setItem(`taskmanager_ws_unlocked_${wsId}`, password);
+        document.getElementById('wsUnlockModal').classList.remove('active');
+        wsUnlockResolver = null;
+        resolve(password);
+      } catch (err) {
+        const errEl = document.getElementById('wsUnlockError');
+        errEl.textContent = err.message || '비밀번호가 일치하지 않습니다.';
+        errEl.style.display = 'block';
+      }
+    };
+  });
+}
+
+document.getElementById('wsUnlockSubmitBtn').addEventListener('click', () => {
+  if (!wsUnlockResolver) return;
+  const pw = document.getElementById('wsUnlockInput').value;
+  if (!pw) return;
+  wsUnlockResolver(pw);
+});
+
+document.getElementById('wsUnlockCancelBtn').addEventListener('click', () => {
+  if (wsUnlockResolver) wsUnlockResolver(null);
+});
+
+document.getElementById('wsUnlockInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('wsUnlockSubmitBtn').click();
+});
+
 /* ── Delete Workspace Confirmation ─────────────── */
 let deleteWsTarget = null;
 
@@ -221,12 +390,9 @@ document.getElementById('deleteWsConfirmBtn').addEventListener('click', async ()
   }
 });
 
-document.getElementById('deleteWsModal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) {
-    document.getElementById('deleteWsModal').classList.remove('active');
-    deleteWsTarget = null;
-  }
-});
+// Intentionally no overlay-click handler on deleteWsModal —
+// the Cancel button is the only way to dismiss it to avoid
+// accidentally losing the typed confirmation name.
 
 /* ── Restore Backup ────────────────────────────── */
 document.getElementById('restoreBackupBtn').addEventListener('click', () => {
@@ -660,9 +826,9 @@ function closeTaskModal() {
 }
 
 document.getElementById('cancelTaskBtn').addEventListener('click', closeTaskModal);
-document.getElementById('taskModal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeTaskModal();
-});
+// Intentionally NOT closing the task modal on overlay click —
+// clicking outside the dialog used to wipe out in-progress input.
+// Close/Cancel/Delete buttons are the only way to dismiss it now.
 
 document.getElementById('taskForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -873,11 +1039,12 @@ const DEFAULT_SYSTEM_PROMPT = `당신은 UX디자인팀의 주간보고서를 �
 규칙:
 1. 마크다운 문법(#, *, **, \`\`\`, | 등)을 절대 사용하지 마세요. 일반 텍스트로만 작성하세요.
 2. 예시 보고서는 형식과 구조만 참고하세요. 예시의 내용(텍스트)을 그대로 복사하거나 포함하지 마세요.
-3. 오직 태스크 변동사항의 description과 상태 변화만을 근거로 새로운 내용을 작성하세요.
+3. 오직 태스크 변동사항(description, 상태 변화, 댓글)을 근거로 새로운 내용을 작성하세요.
 4. 한국어 경어체로 작성하세요.
-5. 각 태스크의 description을 활용하여 구체적으로 무엇을 완료/진행했는지 서술하세요.
-6. DONE으로 변경된 항목은 description 기반으로 완료 내용을 요약하세요.
-7. TODO/BACKLOG 항목은 '다음 주 계획'에 반영하세요.`;
+5. 각 태스크의 description과 댓글을 활용하여 구체적으로 무엇을 완료/진행했는지 서술하세요.
+6. DONE으로 변경된 항목은 description과 관련 댓글 기반으로 완료 내용을 요약하세요.
+7. TODO/BACKLOG 항목은 '다음 주 계획'에 반영하세요.
+8. field가 'comment'인 변동사항은 해당 태스크에 대한 팀원의 논의/결정/진행 내역입니다. 변경 관리 기록으로 취급하고 주요 내용을 보고서에 반영하세요.`;
 
 document.getElementById('reportBtn').addEventListener('click', () => {
   document.getElementById('reportModal').classList.add('active');
@@ -936,11 +1103,9 @@ document.getElementById('closeReportBtn').addEventListener('click', () => {
   document.getElementById('reportModal').classList.remove('active');
 });
 
-document.getElementById('reportModal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) {
-    document.getElementById('reportModal').classList.remove('active');
-  }
-});
+// Intentionally no overlay-click close for the report modal —
+// the Close button is the only way to dismiss it so users
+// don't lose their system prompt / template input.
 
 async function loadChangesPreview() {
   const days = document.getElementById('reportDays').value;
@@ -958,6 +1123,7 @@ async function loadChangesPreview() {
           created: 'Created', deleted: 'Deleted', status: 'Status',
           title: 'Title', priority: 'Priority', assignee_id: 'Assignee',
           description: 'Description', due_date: 'Due Date', tags: 'Tags',
+          comment: 'Comment',
         }[h.field_name] || h.field_name;
 
         let detail = '';
@@ -965,6 +1131,8 @@ async function loadChangesPreview() {
           detail = `→ ${h.new_value}`;
         } else if (h.field_name === 'deleted') {
           detail = '(deleted)';
+        } else if (h.field_name === 'comment') {
+          detail = h.new_value || '';
         } else {
           detail = `${h.old_value || '(empty)'} → ${h.new_value || '(empty)'}`;
         }
@@ -1057,13 +1225,59 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
   }
 });
 
-document.getElementById('copyReportBtn').addEventListener('click', () => {
+async function copyTextToClipboard(text) {
+  // Modern clipboard API (requires HTTPS or localhost + page focus).
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.warn('clipboard.writeText failed, falling back:', err);
+    }
+  }
+  // Fallback: hidden textarea + execCommand. Works on plain HTTP.
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    // Keep it inside the viewport so iOS will copy, but invisible.
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.width = '1px';
+    ta.style.height = '1px';
+    ta.style.padding = '0';
+    ta.style.border = 'none';
+    ta.style.outline = 'none';
+    ta.style.boxShadow = 'none';
+    ta.style.background = 'transparent';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (err) {
+    console.error('execCommand copy failed:', err);
+    return false;
+  }
+}
+
+document.getElementById('copyReportBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('copyReportBtn');
   const text = document.getElementById('reportResult').textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById('copyReportBtn');
+  if (!text) return;
+  const ok = await copyTextToClipboard(text);
+  if (ok) {
     btn.textContent = 'Copied!';
     setTimeout(() => { btn.textContent = 'Copy to Clipboard'; }, 2000);
-  });
+  } else {
+    btn.textContent = 'Copy failed';
+    alert('클립보드 복사에 실패했습니다. 브라우저 권한을 확인하거나 수동으로 선택해 복사하세요.');
+    setTimeout(() => { btn.textContent = 'Copy to Clipboard'; }, 2000);
+  }
 });
 
 /* ── Help Modal ────────────────────────────────── */
@@ -1084,10 +1298,8 @@ document.getElementById('helpBtn').addEventListener('click', async () => {
 document.getElementById('closeHelpBtn').addEventListener('click', () => {
   document.getElementById('helpModal').classList.remove('active');
 });
-
-document.getElementById('helpModal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) document.getElementById('helpModal').classList.remove('active');
-});
+// Help modal is read-only, but we keep the same rule for consistency:
+// only the Close button dismisses it.
 
 function renderMarkdown(md) {
   const lines = md.split('\n');

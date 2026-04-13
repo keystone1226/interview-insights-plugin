@@ -1,6 +1,8 @@
 """Workspace management routes."""
 
+import hashlib
 import json
+import secrets
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -18,8 +20,44 @@ from app.models import (
     Workspace,
     WorkspaceCreate,
     WorkspaceMember,
+    WorkspacePasswordSet,
+    WorkspacePasswordVerify,
     WorkspaceRead,
 )
+
+
+# ── Password helpers ────────────────────────────────
+
+_PBKDF2_ITERATIONS = 120_000
+
+
+def _hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), _PBKDF2_ITERATIONS
+    )
+    return f"{salt}${digest.hex()}"
+
+
+def _verify_password(password: str, stored: str | None) -> bool:
+    if not stored or "$" not in stored:
+        return False
+    salt, hex_hash = stored.split("$", 1)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), _PBKDF2_ITERATIONS
+    )
+    return secrets.compare_digest(digest.hex(), hex_hash)
+
+
+def _to_read(workspace: Workspace) -> WorkspaceRead:
+    return WorkspaceRead(
+        id=workspace.id,
+        name=workspace.name,
+        description=workspace.description,
+        owner_id=workspace.owner_id,
+        created_at=workspace.created_at,
+        has_password=bool(workspace.password_hash),
+    )
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 
@@ -39,7 +77,7 @@ def list_workspaces(
         )
     else:
         query = select(Workspace).order_by(Workspace.name)
-    return session.exec(query).all()
+    return [_to_read(w) for w in session.exec(query).all()]
 
 
 @router.post("", response_model=WorkspaceRead, status_code=201)
@@ -78,7 +116,7 @@ def create_workspace(
 
     session.commit()
     session.refresh(workspace)
-    return workspace
+    return _to_read(workspace)
 
 
 @router.get("/{workspace_id}", response_model=WorkspaceRead)
@@ -86,7 +124,7 @@ def get_workspace(workspace_id: int, session: Session = Depends(get_session)):
     workspace = session.get(Workspace, workspace_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    return workspace
+    return _to_read(workspace)
 
 
 @router.delete("/{workspace_id}", status_code=204)
@@ -154,11 +192,19 @@ def delete_workspace(
 def join_workspace(
     workspace_id: int,
     user_id: int,
+    password: str | None = None,
     session: Session = Depends(get_session),
 ):
     workspace = session.get(Workspace, workspace_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
+
+    if workspace.password_hash:
+        if not password or not _verify_password(password, workspace.password_hash):
+            raise HTTPException(
+                status_code=401,
+                detail="워크스페이스 비밀번호가 일치하지 않습니다.",
+            )
 
     existing = session.exec(
         select(WorkspaceMember)
@@ -172,6 +218,78 @@ def join_workspace(
     session.add(member)
     session.commit()
     return {"ok": True, "message": "Joined workspace"}
+
+
+# ── Workspace Password Management ───────────────────
+
+
+@router.post("/{workspace_id}/verify-password")
+def verify_workspace_password(
+    workspace_id: int,
+    data: WorkspacePasswordVerify,
+    session: Session = Depends(get_session),
+):
+    """Verify a workspace password. Used to unlock a protected workspace."""
+    workspace = session.get(Workspace, workspace_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    if not workspace.password_hash:
+        return {"ok": True, "has_password": False}
+
+    if not _verify_password(data.password, workspace.password_hash):
+        raise HTTPException(
+            status_code=401,
+            detail="비밀번호가 일치하지 않습니다.",
+        )
+    return {"ok": True, "has_password": True}
+
+
+@router.put("/{workspace_id}/password")
+def set_workspace_password(
+    workspace_id: int,
+    data: WorkspacePasswordSet,
+    session: Session = Depends(get_session),
+):
+    """Set, change, or clear a workspace password.
+
+    - If a password is already set, ``current_password`` must match.
+    - Pass an empty/None ``new_password`` to clear the password.
+    """
+    workspace = session.get(Workspace, workspace_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    if workspace.password_hash:
+        if not data.current_password or not _verify_password(
+            data.current_password, workspace.password_hash
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="현재 비밀번호가 올바르지 않습니다.",
+            )
+
+    new_pw = (data.new_password or "").strip()
+    if new_pw:
+        if len(new_pw) < 4:
+            raise HTTPException(
+                status_code=400,
+                detail="비밀번호는 최소 4자 이상이어야 합니다.",
+            )
+        workspace.password_hash = _hash_password(new_pw)
+        message = "워크스페이스 비밀번호가 설정되었습니다."
+    else:
+        workspace.password_hash = None
+        message = "워크스페이스 비밀번호가 해제되었습니다."
+
+    session.add(workspace)
+    session.commit()
+    session.refresh(workspace)
+    return {
+        "ok": True,
+        "message": message,
+        "has_password": bool(workspace.password_hash),
+    }
 
 
 # ── Backup: Markdown Export ─────────────────────────
@@ -306,6 +424,10 @@ def export_workspace_backup(
                     lines.append(f"- [{time_str}] **{h.task_title}** created -> {h.new_value}")
                 elif h.field_name == "deleted":
                     lines.append(f"- [{time_str}] **{h.task_title}** deleted")
+                elif h.field_name == "comment":
+                    lines.append(
+                        f"- [{time_str}] **{h.task_title}** comment: {h.new_value or ''}"
+                    )
                 else:
                     lines.append(
                         f"- [{time_str}] **{h.task_title}** {h.field_name}: "

@@ -229,6 +229,48 @@
     </div>
   </div>
 
+  <!-- Workspace Password Setup Modal (set / change / clear) -->
+  <div class="modal-overlay" id="wsPasswordModal">
+    <div class="modal" style="max-width:420px">
+      <h2 id="wsPasswordTitle">Set Workspace Password</h2>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px" id="wsPasswordSubtitle">
+        이 워크스페이스에 접근하려면 비밀번호가 필요합니다.
+      </p>
+      <div class="form-group" id="wsPasswordCurrentGroup" style="display:none">
+        <label>Current Password</label>
+        <input type="password" id="wsPasswordCurrent" placeholder="현재 비밀번호" autocomplete="current-password">
+      </div>
+      <div class="form-group">
+        <label id="wsPasswordNewLabel">New Password</label>
+        <input type="password" id="wsPasswordNew" placeholder="새 비밀번호 (비우면 해제)" autocomplete="new-password">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">최소 4자. 비워두면 비밀번호가 해제됩니다.</div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="wsPasswordCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="wsPasswordSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Workspace Unlock Modal (prompt password before joining) -->
+  <div class="modal-overlay" id="wsUnlockModal">
+    <div class="modal" style="max-width:380px">
+      <h2>Unlock Workspace</h2>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">
+        <strong id="wsUnlockName"></strong> 워크스페이스는 비밀번호로 잠겨 있습니다.
+      </p>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="wsUnlockInput" placeholder="워크스페이스 비밀번호" autocomplete="current-password">
+      </div>
+      <div id="wsUnlockError" style="display:none;color:var(--danger);font-size:12px;margin-bottom:8px"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="wsUnlockCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="wsUnlockSubmitBtn">Unlock</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Delete Workspace Confirmation Modal -->
   <div class="modal-overlay" id="deleteWsModal">
     <div class="modal" style="max-width:400px;text-align:center">

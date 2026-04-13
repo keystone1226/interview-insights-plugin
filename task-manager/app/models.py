@@ -54,6 +54,8 @@ class Workspace(SQLModel, table=True):
     name: str = Field(max_length=100, index=True)
     description: Optional[str] = Field(default=None, max_length=500)
     owner_id: int = Field(foreign_key="user.id")
+    # PBKDF2 hashed password in "salt$hexhash" format. None when unprotected.
+    password_hash: Optional[str] = Field(default=None, max_length=200)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     members: list["WorkspaceMember"] = Relationship(back_populates="workspace")
@@ -80,6 +82,22 @@ class WorkspaceRead(SQLModel):
     description: Optional[str]
     owner_id: int
     created_at: datetime
+    has_password: bool = False
+
+
+class WorkspacePasswordSet(SQLModel):
+    """Payload for setting / changing / clearing a workspace password.
+
+    - ``new_password`` is None or empty string to clear the password.
+    - ``current_password`` is required when a password is already set.
+    """
+
+    new_password: Optional[str] = None
+    current_password: Optional[str] = None
+
+
+class WorkspacePasswordVerify(SQLModel):
+    password: str
 
 
 # ── BoardColumn ───────────────────────────────────────
@@ -268,11 +286,13 @@ DEFAULT_SYSTEM_PROMPT = (
     "규칙:\n"
     "1. 마크다운 문법(#, *, **, ```, | 등)을 절대 사용하지 마세요. 일반 텍스트로만 작성하세요.\n"
     "2. 예시 보고서는 형식과 구조만 참고하세요. 예시의 내용(텍스트)을 그대로 복사하거나 포함하지 마세요.\n"
-    "3. 오직 태스크 변동사항의 description과 상태 변화만을 근거로 새로운 내용을 작성하세요.\n"
+    "3. 오직 태스크 변동사항(description, 상태 변화, 댓글)을 근거로 새로운 내용을 작성하세요.\n"
     "4. 한국어 경어체로 작성하세요.\n"
-    "5. 각 태스크의 description을 활용하여 구체적으로 무엇을 완료/진행했는지 서술하세요.\n"
-    "6. DONE으로 변경된 항목은 description 기반으로 완료 내용을 요약하세요.\n"
-    "7. TODO/BACKLOG 항목은 '다음 주 계획'에 반영하세요."
+    "5. 각 태스크의 description과 댓글을 활용하여 구체적으로 무엇을 완료/진행했는지 서술하세요.\n"
+    "6. DONE으로 변경된 항목은 description과 관련 댓글 기반으로 완료 내용을 요약하세요.\n"
+    "7. TODO/BACKLOG 항목은 '다음 주 계획'에 반영하세요.\n"
+    "8. field가 'comment'인 변동사항은 해당 태스크에 대한 팀원의 논의/결정/진행 내역입니다. "
+    "변경 관리 기록으로 취급하고 주요 내용을 보고서에 반영하세요."
 )
 
 

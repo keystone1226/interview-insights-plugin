@@ -13,6 +13,7 @@ from app.models import (
     Notification,
     NotificationType,
     Task,
+    TaskHistory,
     User,
 )
 
@@ -79,6 +80,21 @@ def create_comment(
     session.add(comment)
     session.commit()
     session.refresh(comment)
+
+    # Record comment as a task-history change so it appears in the weekly
+    # report and the daily changelog (comments are change management).
+    history_label = f"{author.nickname}: {data.content}"
+    session.add(
+        TaskHistory(
+            task_id=task.id,
+            task_title=task.title,
+            field_name="comment",
+            old_value=None,
+            new_value=history_label,
+            changed_by_id=data.author_id,
+            workspace_id=task.workspace_id,
+        )
+    )
 
     _create_mention_notifications(session, comment, task)
     session.commit()
