@@ -142,6 +142,37 @@ Weekly Report 모달에서 **Agent Instructions (System Prompt)** 토글을 열�
 
 새 서버에서 기존 데이터를 이어서 사용할 때 유용합니다.
 
+### 워크스페이스 비밀번호
+
+워크스페이스별로 접근 비밀번호를 설정할 수 있습니다.
+
+- Switch Workspace 모달에서 각 항목의 **Password** 버튼 → 설정/변경/해제
+- 비밀번호가 걸린 워크스페이스는 자물쇠(🔒) 배지로 표시됨
+- 클릭 시 Unlock 모달이 뜨고, 정답을 입력해야만 진입 가능
+- 비밀번호 검증 결과는 세션 동안 `sessionStorage`에 캐시되어 리로드마다 재입력 요구는 없음(탭 종료 시 초기화)
+- 저장 방식: PBKDF2-SHA256 (120k iterations) 해시 — 원문은 DB/로그/백업 어디에도 남지 않음
+
+#### 비밀번호 분실 시 (관리자 CLI)
+
+비밀번호는 단방향 해시라 복호화는 불가능합니다. 대신 서버 관리자가 CLI로 리셋할 수 있습니다.
+
+```bash
+# 전체 워크스페이스 목록 + password_hash 조회
+python -m app list-workspaces
+
+# 특정 워크스페이스 비밀번호 해제
+python -m app reset-password 3 --clear
+
+# 특정 워크스페이스 비밀번호 새로 설정 (대화형 입력 — 권장)
+python -m app reset-password 3
+
+# 스크립트용 (비번이 셸 히스토리에 남으니 지양)
+python -m app reset-password 3 --new-password 'new-secret'
+```
+
+`reset-password`는 대화형 입력(`getpass`)이 기본이고, 입력 후 확인을 한 번 더 받습니다.
+셸 히스토리에 남지 않으므로 일반적으로 대화형 모드를 쓰세요.
+
 ---
 
 ## 버전 업그레이드
