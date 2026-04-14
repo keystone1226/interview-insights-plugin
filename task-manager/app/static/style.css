@@ -1,3 +1,6 @@
+/* ── Font ──────────────────────────────────────── */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+
 /* ── Reset & Base ───────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -30,10 +33,10 @@
   --low: #9ca3af;
   --success: #10b981;
 
-  /* Radius */
-  --radius-sm: 8px;
-  --radius: 12px;
-  --radius-lg: 20px;
+  /* Radius — subtle */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 10px;
   --radius-pill: 9999px;
 
   /* Shadows */
@@ -43,13 +46,13 @@
 }
 
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
 }
 
 /* ── Header ─────────────────────────────────────── */
