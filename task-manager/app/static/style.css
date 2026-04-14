@@ -5,49 +5,65 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Surfaces */
-  --bg: #ebedef;
-  --surface: #ffffff;
-  --surface2: #f3f4f8;
-  --surface3: #e8eaee;
+  /* Surfaces — warm cream palette */
+  --bg: #efe6d4;
+  --surface: #fefaf3;
+  --surface2: #f5ede0;
+  --surface3: #ede2cf;
 
   /* Borders */
-  --border: #e9ebf0;
-  --border-strong: #d6d9e0;
+  --border: #e8dfcc;
+  --border-strong: #d9cdb4;
 
-  /* Text */
-  --text: #0f172a;
-  --text-muted: #9ca3af;
-  --text-subtle: #cbd5e1;
+  /* Text — warm near-black / cocoa */
+  --text: #2d2416;
+  --text-muted: #8c7f68;
+  --text-subtle: #c7bca6;
 
-  /* Brand */
-  --primary: #4f6bfc;
-  --primary-hover: #3b57ec;
-  --primary-soft: #eef0fe;
+  /* Brand — burnt terracotta (macOS Orange-ish) */
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-soft: #fde9d8;
+  --primary-ring: rgba(194, 65, 12, 0.18);
 
   /* Semantic */
-  --danger: #ef4444;
-  --danger-hover: #dc2626;
-  --high: #ef4444;
-  --medium: #f59e0b;
-  --low: #9ca3af;
-  --success: #10b981;
+  --danger: #c1272d;
+  --danger-hover: #991b1e;
+  --high: #c1272d;
+  --medium: #b45309;
+  --low: #8c7f68;
+  --success: #5a8a4a;
 
-  /* Radius — subtle */
-  --radius-sm: 6px;
-  --radius: 8px;
-  --radius-lg: 10px;
+  /* Radius */
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-lg: 14px;
   --radius-pill: 9999px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.10);
+  /* Shadows — warm-tinted, layered */
+  --shadow-sm: 0 1px 2px rgba(101, 67, 33, 0.06);
+  --shadow: 0 1px 2px rgba(101, 67, 33, 0.05), 0 6px 20px rgba(101, 67, 33, 0.08);
+  --shadow-lg: 0 2px 4px rgba(101, 67, 33, 0.06), 0 18px 44px rgba(101, 67, 33, 0.14);
 }
 
 body {
-  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-  background: var(--bg);
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "SF Pro Display",
+    "Pretendard Variable",
+    Pretendard,
+    system-ui,
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    "Malgun Gothic",
+    sans-serif;
+  background:
+    radial-gradient(at 18% 0%, #f7edda 0%, transparent 45%),
+    radial-gradient(at 82% 100%, #f3e3cc 0%, transparent 50%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -61,7 +77,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 14px 28px;
-  background: var(--surface);
+  background: rgba(254, 250, 243, 0.88);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -71,7 +87,7 @@ body {
 .header h1 {
   font-size: 18px;
   font-weight: 700;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
 }
 
 .header-actions {
@@ -158,8 +174,8 @@ body {
   color: var(--text);
 }
 
-.help-content h1 { font-size: 22px; margin: 24px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; font-weight: 700; letter-spacing: -0.015em; }
-.help-content h2 { font-size: 17px; margin: 20px 0 10px; color: var(--primary); font-weight: 700; letter-spacing: -0.01em; }
+.help-content h1 { font-size: 22px; margin: 24px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; font-weight: 700; letter-spacing: -0.02em; }
+.help-content h2 { font-size: 17px; margin: 20px 0 10px; color: var(--primary); font-weight: 700; letter-spacing: -0.015em; }
 .help-content h3 { font-size: 15px; margin: 16px 0 8px; font-weight: 600; }
 .help-content h4 { font-size: 14px; margin: 12px 0 6px; font-weight: 600; }
 .help-content p { margin: 6px 0; }
@@ -174,12 +190,12 @@ body {
   border-radius: 6px;
   font-size: 13px;
   color: var(--primary);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 
 .help-content pre {
   background: var(--surface2);
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px 16px;
   overflow-x: auto;
@@ -206,8 +222,8 @@ body {
 .column {
   flex: 0 0 320px;
   background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  border: none;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
@@ -222,7 +238,7 @@ body {
   padding: 18px 20px 12px;
   font-weight: 700;
   font-size: 14px;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .column-header .count {
@@ -260,12 +276,13 @@ body {
   border-radius: var(--radius);
   padding: 14px;
   cursor: grab;
+  box-shadow: var(--shadow-sm);
   transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
 }
 
 .task-card:hover {
-  border-color: transparent;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(79, 107, 252, 0.14);
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 4px rgba(101, 67, 33, 0.06), 0 10px 28px rgba(194, 65, 12, 0.12);
   transform: translateY(-1px);
 }
 
@@ -287,7 +304,7 @@ body {
   font-weight: 600;
   margin-bottom: 10px;
   line-height: 1.4;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
 }
 
 .task-card-meta {
@@ -307,9 +324,9 @@ body {
   letter-spacing: 0.04em;
 }
 
-.priority-HIGH { background: #fee2e2; color: #b91c1c; }
-.priority-MEDIUM { background: #fef3c7; color: #b45309; }
-.priority-LOW { background: #f3f4f6; color: #6b7280; }
+.priority-HIGH { background: #fbe2e1; color: #b42218; }
+.priority-MEDIUM { background: #fde9d8; color: #9a3412; }
+.priority-LOW { background: #ede2cf; color: #6b5f45; }
 
 .tag-badge {
   padding: 3px 10px;
@@ -378,7 +395,7 @@ body {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.35);
+  background: rgba(45, 36, 22, 0.32);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   z-index: 200;
@@ -390,7 +407,7 @@ body {
 
 .modal {
   background: var(--surface);
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   width: 90%;
   max-width: 560px;
@@ -404,7 +421,7 @@ body {
   font-size: 20px;
   margin-bottom: 20px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 
 .form-group {
@@ -446,7 +463,7 @@ body {
   outline: none;
   background: var(--surface);
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(79, 107, 252, 0.14);
+  box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
 .form-group textarea { resize: vertical; min-height: 84px; line-height: 1.55; }
@@ -464,7 +481,7 @@ body {
   margin-top: 24px;
 }
 
-/* ── Buttons (pill-shaped) ────────────────────────── */
+/* ── Buttons (pill-shaped, subtle Tahoe gloss) ─────── */
 .btn {
   padding: 10px 20px;
   border-radius: var(--radius-pill);
@@ -473,20 +490,48 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, transform 0.1s, box-shadow 0.15s;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
   font-family: inherit;
 }
 
 .btn:active { transform: scale(0.97); }
 
-.btn-primary { background: var(--primary); color: #fff; }
-.btn-primary:hover { background: var(--primary-hover); box-shadow: 0 4px 14px rgba(79, 107, 252, 0.32); }
+.btn-primary {
+  background: linear-gradient(180deg, #d4622d 0%, var(--primary) 100%);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 1px 2px rgba(194, 65, 12, 0.25),
+    0 4px 14px rgba(194, 65, 12, 0.18);
+}
+.btn-primary:hover {
+  background: linear-gradient(180deg, #c2541e 0%, var(--primary-hover) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 1px 2px rgba(154, 52, 18, 0.3),
+    0 6px 18px rgba(154, 52, 18, 0.25);
+}
 
-.btn-secondary { background: var(--surface2); color: var(--text); }
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 1px 2px rgba(101, 67, 33, 0.04);
+}
 .btn-secondary:hover { background: var(--surface3); }
 
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: var(--danger-hover); box-shadow: 0 4px 14px rgba(239, 68, 68, 0.28); }
+.btn-danger {
+  background: linear-gradient(180deg, #d63a40 0%, var(--danger) 100%);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 1px 2px rgba(193, 39, 45, 0.25),
+    0 4px 14px rgba(193, 39, 45, 0.18);
+}
+.btn-danger:hover {
+  background: linear-gradient(180deg, #bb2228 0%, var(--danger-hover) 100%);
+}
 
 .btn-sm { padding: 7px 14px; font-size: 12px; }
 
@@ -499,7 +544,7 @@ body {
   width: 360px;
   max-height: 480px;
   background: var(--surface);
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   z-index: 150;
@@ -531,7 +576,7 @@ body {
   border-left: 3px solid var(--primary);
   background: var(--primary-soft);
 }
-.notification-item.unread:hover { background: #e4e9fe; }
+.notification-item.unread:hover { background: #fbddc2; }
 
 .notification-item .notif-time {
   font-size: 11px;
@@ -610,7 +655,7 @@ body {
   outline: none;
   background: var(--surface);
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(79, 107, 252, 0.14);
+  box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
 /* ── Nickname Modal ─────────────────────────────── */
@@ -625,7 +670,7 @@ body {
 .mention-dropdown {
   position: absolute;
   background: var(--surface);
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   max-height: 160px;
   overflow-y: auto;
@@ -680,7 +725,7 @@ body {
 /* ── Report ────────────────────────────────────── */
 .changes-preview {
   background: var(--surface2);
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px 16px;
   max-height: 200px;
@@ -709,7 +754,7 @@ body {
 
 .report-result {
   background: var(--surface2);
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 18px 20px;
   max-height: 400px;
@@ -746,8 +791,8 @@ body {
 
 .workspace-item:hover {
   background: var(--surface);
-  border-color: transparent;
-  box-shadow: 0 4px 16px rgba(79, 107, 252, 0.14);
+  border-color: var(--border-strong);
+  box-shadow: 0 4px 16px rgba(194, 65, 12, 0.14);
   transform: translateY(-1px);
 }
 
@@ -773,7 +818,7 @@ body {
   font-weight: 700;
   font-size: 15px;
   margin-bottom: 2px;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .ws-lock-badge {
@@ -815,7 +860,7 @@ body {
   outline: none;
   background: var(--surface);
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(79, 107, 252, 0.14);
+  box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
 /* ── Scrollbar ──────────────────────────────────── */
