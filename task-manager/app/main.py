@@ -208,6 +208,20 @@ def _cmd_list_workspaces() -> int:
     return 0
 
 
+def _cmd_stats() -> int:
+    """Print self-hosted usage analytics (funnel, churn, engagement)."""
+    from sqlmodel import Session
+
+    from app.stats import compute_stats, format_stats
+
+    _ensure_db_ready()
+
+    with Session(engine) as session:
+        stats = compute_stats(session, str(DB_PATH))
+    print(format_stats(stats))
+    return 0
+
+
 def _cmd_reset_password(
     workspace_id: int,
     new_password: str | None,
@@ -283,6 +297,12 @@ def main():
         help="List all workspaces with their password_hash column value",
     )
 
+    # stats: print usage analytics (funnel / churn / engagement)
+    subparsers.add_parser(
+        "stats",
+        help="Print self-hosted usage analytics read from the local DB",
+    )
+
     # reset-password <workspace_id>
     reset_parser = subparsers.add_parser(
         "reset-password",
@@ -302,7 +322,7 @@ def main():
 
     # Backwards compatibility: `python -m app --host X --port Y` (no subcommand)
     # We only register --host/--port on the top-level parser if no subcommand is given.
-    if len(sys.argv) > 1 and sys.argv[1] in {"run", "list-workspaces", "reset-password", "-h", "--help"}:
+    if len(sys.argv) > 1 and sys.argv[1] in {"run", "list-workspaces", "reset-password", "stats", "-h", "--help"}:
         args = parser.parse_args()
     else:
         legacy = argparse.ArgumentParser(description="Lightweight Task Manager")
@@ -314,6 +334,8 @@ def main():
 
     if args.command == "list-workspaces":
         sys.exit(_cmd_list_workspaces())
+    if args.command == "stats":
+        sys.exit(_cmd_stats())
     if args.command == "reset-password":
         sys.exit(
             _cmd_reset_password(

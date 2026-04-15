@@ -23,6 +23,9 @@ async function api(path, opts = {}) {
   if (currentWorkspace) {
     headers['X-Workspace-Id'] = String(currentWorkspace.id);
   }
+  if (currentUser && currentUser.id) {
+    headers['X-User-Id'] = String(currentUser.id);
+  }
   const res = await fetch(path, { headers, ...opts });
   if (res.status === 204) return null;
   if (!res.ok) {
@@ -867,6 +870,7 @@ document.getElementById('taskForm').addEventListener('submit', async e => {
       formData.append('file', imageInput.files[0]);
       const imgHeaders = {};
       if (currentWorkspace) imgHeaders['X-Workspace-Id'] = String(currentWorkspace.id);
+      if (currentUser && currentUser.id) imgHeaders['X-User-Id'] = String(currentUser.id);
       await fetch(`/api/tasks/${savedTask.id}/image`, { method: 'POST', body: formData, headers: imgHeaders });
     }
 

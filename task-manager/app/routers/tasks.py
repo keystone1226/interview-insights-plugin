@@ -11,7 +11,7 @@ from sqlmodel import Session, select
 
 from app.config import UPLOAD_DIR
 from app.database import get_session
-from app.deps import get_workspace_id
+from app.deps import get_user_id, get_workspace_id
 from app.models import (
     Notification,
     NotificationType,
@@ -101,6 +101,7 @@ def create_task(
     data: TaskCreate,
     session: Session = Depends(get_session),
     workspace_id: int | None = Depends(get_workspace_id),
+    user_id: int | None = Depends(get_user_id),
 ):
     task = Task.model_validate(data)
     task.workspace_id = workspace_id
@@ -109,7 +110,7 @@ def create_task(
     session.add(task)
     session.commit()
     session.refresh(task)
-    _record_history(session, task, "created", None, task.status)
+    _record_history(session, task, "created", None, task.status, changed_by_id=user_id)
     if task.assignee_id:
         _notify_assignment(session, task)
     session.commit()
@@ -125,7 +126,12 @@ def get_task(task_id: int, session: Session = Depends(get_session)):
 
 
 @router.patch("/{task_id}", response_model=TaskRead)
-def update_task(task_id: int, data: TaskUpdate, session: Session = Depends(get_session)):
+def update_task(
+    task_id: int,
+    data: TaskUpdate,
+    session: Session = Depends(get_session),
+    user_id: int | None = Depends(get_user_id),
+):
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -150,7 +156,10 @@ def update_task(task_id: int, data: TaskUpdate, session: Session = Depends(get_s
     # Record history for changed fields
     for field in tracked_fields:
         if field in update_data and str(old_values[field]) != str(update_data[field]):
-            _record_history(session, task, field, old_values[field], update_data[field])
+            _record_history(
+                session, task, field, old_values[field], update_data[field],
+                changed_by_id=user_id,
+            )
 
     session.add(task)
     session.commit()
@@ -160,7 +169,10 @@ def update_task(task_id: int, data: TaskUpdate, session: Session = Depends(get_s
 
 @router.patch("/{task_id}/status", response_model=TaskRead)
 def update_task_status(
-    task_id: int, data: TaskStatusUpdate, session: Session = Depends(get_session)
+    task_id: int,
+    data: TaskStatusUpdate,
+    session: Session = Depends(get_session),
+    user_id: int | None = Depends(get_user_id),
 ):
     task = session.get(Task, task_id)
     if not task:
@@ -173,7 +185,7 @@ def update_task_status(
 
     if old_status != data.status:
         _notify_status_change(session, task, old_status, data.status)
-        _record_history(session, task, "status", old_status, data.status)
+        _record_history(session, task, "status", old_status, data.status, changed_by_id=user_id)
 
     session.add(task)
     session.commit()
@@ -182,12 +194,16 @@ def update_task_status(
 
 
 @router.delete("/{task_id}", status_code=204)
-def delete_task(task_id: int, session: Session = Depends(get_session)):
+def delete_task(
+    task_id: int,
+    session: Session = Depends(get_session),
+    user_id: int | None = Depends(get_user_id),
+):
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     # Record deletion history before deleting
-    _record_history(session, task, "deleted", task.status, None)
+    _record_history(session, task, "deleted", task.status, None, changed_by_id=user_id)
     # Clean up image file if exists
     if task.image_path:
         img_file = UPLOAD_DIR / Path(task.image_path).name
