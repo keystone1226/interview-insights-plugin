@@ -42,6 +42,7 @@
   <div class="modal-overlay" id="taskModal">
     <div class="modal">
       <h2 id="taskModalTitle">New Task</h2>
+      <div id="taskCreatedAt" class="task-meta-date" style="display:none"></div>
       <form id="taskForm">
         <input type="hidden" id="taskId">
         <input type="hidden" id="taskStatus">
@@ -111,6 +112,7 @@
 
         <div class="form-actions">
           <button type="button" class="btn btn-danger" id="deleteTaskBtn" style="display:none;margin-right:auto">Delete</button>
+          <button type="button" class="btn btn-archive" id="archiveTaskBtn" style="display:none">Archive</button>
           <button type="button" class="btn btn-secondary" id="cancelTaskBtn">Cancel</button>
           <button type="submit" class="btn btn-primary">Save</button>
         </div>
@@ -297,6 +299,40 @@
         <button class="btn btn-sm btn-secondary" id="closeHelpBtn">Close</button>
       </div>
       <div id="helpContent" class="help-content"></div>
+    </div>
+  </div>
+
+  <!-- Archive Modal -->
+  <div class="modal-overlay" id="archiveModal">
+    <div class="modal" style="max-width:680px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h2 style="margin-bottom:0">Archived Tasks</h2>
+        <button class="btn btn-sm btn-secondary" id="closeArchiveBtn">Close</button>
+      </div>
+      <div class="archive-filters">
+        <div class="archive-filter-row">
+          <input type="text" id="archiveKeyword" placeholder="Search keyword..." class="archive-search-input">
+          <select id="archiveAssignee" class="archive-filter-select">
+            <option value="">All assignees</option>
+          </select>
+        </div>
+        <div class="archive-filter-row">
+          <div class="archive-date-shortcuts">
+            <button type="button" class="btn btn-sm btn-secondary archive-date-btn" data-days="7">1 Week</button>
+            <button type="button" class="btn btn-sm btn-secondary archive-date-btn" data-days="30">1 Month</button>
+            <button type="button" class="btn btn-sm btn-secondary archive-date-btn" data-days="90">3 Months</button>
+            <button type="button" class="btn btn-sm btn-secondary archive-date-btn" data-days="0">All</button>
+          </div>
+          <div class="archive-date-range">
+            <input type="date" id="archiveDateFrom" title="From">
+            <span style="color:var(--text-muted)">~</span>
+            <input type="date" id="archiveDateTo" title="To">
+          </div>
+        </div>
+      </div>
+      <div id="archiveList" class="archive-list">
+        <div class="archive-empty">No archived tasks</div>
+      </div>
     </div>
   </div>
 

@@ -5,6 +5,7 @@ let allUsers = [];
 let columns = [];
 let tasks = [];
 let notifPanelOpen = false;
+let archivedCount = 0;
 
 const TAG_COLORS = [
   '#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6',
@@ -582,7 +583,7 @@ async function startApp() {
     document.getElementById('switchWorkspaceBtn').style.display = '';
     document.getElementById('restoreBackupBtn').style.display = '';
     await Promise.all([loadColumns(), loadUsers()]);
-    await loadTasks();
+    await Promise.all([loadTasks(), refreshArchivedCount()]);
     console.log('Loaded columns:', columns.length, 'users:', allUsers.length, 'tasks:', tasks.length);
     renderBoard();
     console.log('Board rendered successfully');
@@ -725,6 +726,63 @@ function renderBoard() {
     });
   });
 
+  // Archive column
+  const archiveCol = document.createElement('div');
+  archiveCol.className = 'column column-archive';
+  archiveCol.innerHTML = `
+    <div class="column-color-bar" style="background:#78716c"></div>
+    <div class="column-header">
+      <span>ARCHIVE</span>
+      <span class="count" id="archiveCount">${archivedCount}</span>
+    </div>
+    <div class="column-body archive-drop-zone" id="archiveDropZone">
+      <div class="archive-drop-hint">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="21 8 21 21 3 21 3 8"></polyline>
+          <rect x="1" y="3" width="22" height="5"></rect>
+          <line x1="10" y1="12" x2="14" y2="12"></line>
+        </svg>
+        <span>Drop here to archive</span>
+      </div>
+      <button class="btn btn-sm btn-secondary archive-browse-btn" id="openArchiveBtn">Browse archived</button>
+      <div class="archive-claude-character" id="archiveClaude">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+          <circle cx="18" cy="18" r="16" fill="#D4785C" opacity="0.9"/>
+          <ellipse cx="12" cy="15" rx="2.5" ry="3" fill="white"/>
+          <ellipse cx="24" cy="15" rx="2.5" ry="3" fill="white"/>
+          <ellipse cx="12" cy="15.5" rx="1.2" ry="1.5" fill="#2d1a0e"/>
+          <ellipse cx="24" cy="15.5" rx="1.2" ry="1.5" fill="#2d1a0e"/>
+          <path d="M13 23 Q18 27 23 23" stroke="#2d1a0e" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+  `;
+  board.appendChild(archiveCol);
+
+  // Archive drop zone
+  const archiveZone = archiveCol.querySelector('.archive-drop-zone');
+  archiveZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    archiveZone.classList.add('drag-over');
+  });
+  archiveZone.addEventListener('dragleave', () => archiveZone.classList.remove('drag-over'));
+  archiveZone.addEventListener('drop', async e => {
+    e.preventDefault();
+    archiveZone.classList.remove('drag-over');
+    const taskId = parseInt(e.dataTransfer.getData('text/plain'));
+    try {
+      await api(`/api/tasks/${taskId}/archive`, { method: 'POST' });
+      showArchiveClaude();
+      await loadTasks();
+      await refreshArchivedCount();
+      renderBoard();
+    } catch {}
+  });
+
+  archiveCol.querySelector('#openArchiveBtn').addEventListener('click', () => {
+    openArchiveModal();
+  });
+
   // Card event listeners
   board.querySelectorAll('.task-card').forEach(card => {
     card.addEventListener('dragstart', e => {
@@ -787,6 +845,9 @@ function openTaskModal(task, defaultStatus) {
   assigneeSelect.innerHTML = '<option value="">Unassigned</option>' +
     allUsers.map(u => `<option value="${u.id}">${escHtml(u.nickname)}</option>`).join('');
 
+  const createdAtEl = document.getElementById('taskCreatedAt');
+  const archiveBtn = document.getElementById('archiveTaskBtn');
+
   if (task) {
     title.textContent = 'Edit Task';
     document.getElementById('taskId').value = task.id;
@@ -800,8 +861,14 @@ function openTaskModal(task, defaultStatus) {
     document.getElementById('taskFigma').value = task.figma_url || '';
     document.getElementById('taskConfluence').value = task.confluence_url || '';
     deleteBtn.style.display = 'block';
+    archiveBtn.style.display = 'block';
     commentsSection.style.display = 'block';
     loadComments(task.id);
+
+    // Show created_at
+    const created = new Date(task.created_at);
+    createdAtEl.textContent = `Created: ${created.toLocaleDateString('ko-KR')} ${created.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`;
+    createdAtEl.style.display = 'block';
 
     if (task.image_path) {
       const preview = document.getElementById('imagePreview');
@@ -816,7 +883,9 @@ function openTaskModal(task, defaultStatus) {
     document.getElementById('taskId').value = '';
     document.getElementById('taskStatus').value = defaultStatus || 'TODO';
     deleteBtn.style.display = 'none';
+    archiveBtn.style.display = 'none';
     commentsSection.style.display = 'none';
+    createdAtEl.style.display = 'none';
     document.getElementById('imagePreview').style.display = 'none';
   }
 
@@ -889,6 +958,21 @@ document.getElementById('deleteTaskBtn').addEventListener('click', async () => {
   await loadTasks();
   renderBoard();
   closeTaskModal();
+});
+
+document.getElementById('archiveTaskBtn').addEventListener('click', async () => {
+  const id = document.getElementById('taskId').value;
+  if (!id) return;
+  try {
+    await api(`/api/tasks/${id}/archive`, { method: 'POST' });
+    closeTaskModal();
+    showArchiveClaude();
+    await loadTasks();
+    await refreshArchivedCount();
+    renderBoard();
+  } catch (err) {
+    alert('Archive error: ' + err.message);
+  }
 });
 
 /* ── Image Upload ───────────────────────────────── */
@@ -1036,6 +1120,142 @@ function timeAgo(dateStr) {
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 }
+
+/* ── Archive ───────────────────────────────────── */
+async function refreshArchivedCount() {
+  try {
+    const data = await api('/api/tasks/archived/count');
+    archivedCount = data.count;
+    const el = document.getElementById('archiveCount');
+    if (el) el.textContent = archivedCount;
+  } catch {}
+}
+
+function showArchiveClaude() {
+  const el = document.getElementById('archiveClaude');
+  if (!el) return;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1600);
+}
+
+function openArchiveModal() {
+  const modal = document.getElementById('archiveModal');
+  modal.classList.add('active');
+  // Populate assignee filter
+  const sel = document.getElementById('archiveAssignee');
+  sel.innerHTML = '<option value="">All assignees</option>' +
+    allUsers.map(u => `<option value="${u.id}">${escHtml(u.nickname)}</option>`).join('');
+  // Reset filters
+  document.getElementById('archiveKeyword').value = '';
+  document.getElementById('archiveDateFrom').value = '';
+  document.getElementById('archiveDateTo').value = '';
+  document.querySelectorAll('.archive-date-btn').forEach(b => b.classList.remove('active'));
+  searchArchivedTasks();
+}
+
+document.getElementById('closeArchiveBtn').addEventListener('click', () => {
+  document.getElementById('archiveModal').classList.remove('active');
+});
+
+async function searchArchivedTasks() {
+  const keyword = document.getElementById('archiveKeyword').value.trim();
+  const assigneeId = document.getElementById('archiveAssignee').value;
+  const dateFrom = document.getElementById('archiveDateFrom').value;
+  const dateTo = document.getElementById('archiveDateTo').value;
+
+  let url = '/api/tasks/archived/search?';
+  const params = [];
+  if (keyword) params.push(`keyword=${encodeURIComponent(keyword)}`);
+  if (assigneeId) params.push(`assignee_id=${assigneeId}`);
+  if (dateFrom) params.push(`date_from=${dateFrom}`);
+  if (dateTo) params.push(`date_to=${dateTo}`);
+  url += params.join('&');
+
+  try {
+    const archived = await api(url);
+    renderArchiveList(archived);
+  } catch (err) {
+    document.getElementById('archiveList').innerHTML =
+      `<div class="archive-empty">Error: ${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderArchiveList(archived) {
+  const list = document.getElementById('archiveList');
+  if (!archived.length) {
+    list.innerHTML = '<div class="archive-empty">No archived tasks found</div>';
+    return;
+  }
+  list.innerHTML = archived.map(t => {
+    const assignee = t.assignee_user ? t.assignee_user.nickname : '';
+    const created = new Date(t.created_at).toLocaleDateString('ko-KR');
+    const tags = parseTags(t.tags);
+    return `
+      <div class="archive-item" data-id="${t.id}">
+        <div class="archive-item-main">
+          <div class="archive-item-title">
+            <span class="priority-badge priority-${t.priority}">${t.priority}</span>
+            ${escHtml(t.title)}
+          </div>
+          <div class="archive-item-meta">
+            <span class="archive-item-status">${t.status.replace(/_/g, ' ')}</span>
+            ${assignee ? `<span class="assignee-badge">${escHtml(assignee)}</span>` : ''}
+            <span style="color:var(--text-muted)">${created}</span>
+            ${tags.map(tag => `<span class="tag-badge" style="background:${tagColor(tag)}22;color:${tagColor(tag)}">${escHtml(tag)}</span>`).join('')}
+          </div>
+        </div>
+        <button class="btn btn-sm btn-secondary archive-restore-btn" data-id="${t.id}" title="Restore to board">Restore</button>
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('.archive-restore-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const taskId = btn.dataset.id;
+      try {
+        await api(`/api/tasks/${taskId}/unarchive`, { method: 'POST' });
+        await loadTasks();
+        await refreshArchivedCount();
+        renderBoard();
+        searchArchivedTasks();
+      } catch (err) {
+        alert('Restore error: ' + err.message);
+      }
+    });
+  });
+}
+
+// Archive filter event listeners
+let archiveSearchTimer = null;
+document.getElementById('archiveKeyword').addEventListener('input', () => {
+  clearTimeout(archiveSearchTimer);
+  archiveSearchTimer = setTimeout(searchArchivedTasks, 300);
+});
+document.getElementById('archiveAssignee').addEventListener('change', searchArchivedTasks);
+document.getElementById('archiveDateFrom').addEventListener('change', searchArchivedTasks);
+document.getElementById('archiveDateTo').addEventListener('change', searchArchivedTasks);
+
+document.querySelectorAll('.archive-date-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.archive-date-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const days = parseInt(btn.dataset.days);
+    if (days === 0) {
+      document.getElementById('archiveDateFrom').value = '';
+      document.getElementById('archiveDateTo').value = '';
+    } else {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - days);
+      document.getElementById('archiveDateFrom').value = from.toISOString().slice(0, 10);
+      document.getElementById('archiveDateTo').value = to.toISOString().slice(0, 10);
+    }
+    searchArchivedTasks();
+  });
+});
 
 /* ── Weekly Report ─────────────────────────────── */
 const DEFAULT_SYSTEM_PROMPT = `당신은 UX디자인팀의 주간보고서를 작성하는 어시스턴트입니다.

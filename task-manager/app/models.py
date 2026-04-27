@@ -144,6 +144,7 @@ class TaskBase(SQLModel):
     due_date: Optional[date] = Field(default=None)
     tags: Optional[str] = Field(default=None)  # JSON array string
     sort_order: int = Field(default=0)
+    archived: bool = Field(default=False)
 
 
 class Task(TaskBase, table=True):
@@ -189,6 +190,7 @@ class TaskUpdate(SQLModel):
     due_date: Optional[date] = None
     tags: Optional[str] = None
     sort_order: Optional[int] = None
+    archived: Optional[bool] = None
 
 
 class TaskStatusUpdate(SQLModel):

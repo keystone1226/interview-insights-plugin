@@ -2,7 +2,7 @@
 
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import aiofiles
@@ -83,7 +83,7 @@ def list_tasks(
     session: Session = Depends(get_session),
     workspace_id: int | None = Depends(get_workspace_id),
 ):
-    query = select(Task)
+    query = select(Task).where(Task.archived == False)
     if workspace_id:
         query = query.where(Task.workspace_id == workspace_id)
     else:
@@ -250,3 +250,90 @@ async def upload_task_image(
     session.commit()
     session.refresh(task)
     return task
+
+
+# ── Archive ────────────────────────────────────────
+
+
+@router.post("/{task_id}/archive", response_model=TaskRead)
+def archive_task(
+    task_id: int,
+    session: Session = Depends(get_session),
+    user_id: int | None = Depends(get_user_id),
+):
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task.archived:
+        return task
+    task.archived = True
+    task.updated_at = datetime.utcnow()
+    _record_history(session, task, "archived", "false", "true", changed_by_id=user_id)
+    session.add(task)
+    session.commit()
+    session.refresh(task)
+    return task
+
+
+@router.post("/{task_id}/unarchive", response_model=TaskRead)
+def unarchive_task(
+    task_id: int,
+    session: Session = Depends(get_session),
+    user_id: int | None = Depends(get_user_id),
+):
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if not task.archived:
+        return task
+    task.archived = False
+    task.updated_at = datetime.utcnow()
+    _record_history(session, task, "unarchived", "true", "false", changed_by_id=user_id)
+    session.add(task)
+    session.commit()
+    session.refresh(task)
+    return task
+
+
+@router.get("/archived/search", response_model=list[TaskRead])
+def search_archived_tasks(
+    keyword: str | None = None,
+    assignee_id: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    session: Session = Depends(get_session),
+    workspace_id: int | None = Depends(get_workspace_id),
+):
+    query = select(Task).where(Task.archived == True)
+    if workspace_id:
+        query = query.where(Task.workspace_id == workspace_id)
+    else:
+        query = query.where(Task.workspace_id.is_(None))
+    if keyword:
+        pattern = f"%{keyword}%"
+        query = query.where(
+            (Task.title.ilike(pattern)) | (Task.description.ilike(pattern))
+        )
+    if assignee_id:
+        query = query.where(Task.assignee_id == assignee_id)
+    if date_from:
+        query = query.where(Task.created_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        to_dt = datetime.fromisoformat(date_to) + timedelta(days=1)
+        query = query.where(Task.created_at < to_dt)
+    query = query.order_by(Task.updated_at.desc())
+    return session.exec(query).all()
+
+
+@router.get("/archived/count")
+def archived_task_count(
+    session: Session = Depends(get_session),
+    workspace_id: int | None = Depends(get_workspace_id),
+):
+    query = select(Task).where(Task.archived == True)
+    if workspace_id:
+        query = query.where(Task.workspace_id == workspace_id)
+    else:
+        query = query.where(Task.workspace_id.is_(None))
+    count = len(session.exec(query).all())
+    return {"count": count}
