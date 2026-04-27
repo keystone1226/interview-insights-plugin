@@ -736,15 +736,31 @@ function renderBoard() {
       <span class="count" id="archiveCount">${archivedCount}</span>
     </div>
     <div class="column-body archive-drop-zone" id="archiveDropZone">
-      <div class="archive-drop-hint">
+      <div class="claude-character-wrapper" id="claudeCharacter" style="left:calc(50% - 24px)">
+        <div class="claude-emoji" id="claudeEmoji"></div>
+        <svg class="claude-svg" viewBox="0 0 45 55" width="48" height="58">
+          <rect x="5" y="0" width="10" height="10" fill="currentColor"/>
+          <rect x="30" y="0" width="10" height="10" fill="currentColor"/>
+          <rect x="5" y="10" width="35" height="25" fill="currentColor"/>
+          <g class="claude-eyes">
+            <rect x="10" y="15" width="8" height="8" fill="#1a1a2e"/>
+            <rect x="27" y="15" width="8" height="8" fill="#1a1a2e"/>
+          </g>
+          <rect class="claude-leg" x="5" y="35" width="5" height="15" fill="currentColor"/>
+          <rect class="claude-leg" x="15" y="35" width="5" height="15" fill="currentColor"/>
+          <rect class="claude-leg" x="25" y="35" width="5" height="15" fill="currentColor"/>
+          <rect class="claude-leg" x="35" y="35" width="5" height="15" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="archive-drop-hint" style="margin-top:68px">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="21 8 21 21 3 21 3 8"></polyline>
           <rect x="1" y="3" width="22" height="5"></rect>
           <line x1="10" y1="12" x2="14" y2="12"></line>
         </svg>
-        <span>Drop here to archive</span>
+        <span>Drop Here to Archive</span>
       </div>
-      <button class="btn btn-sm btn-secondary archive-browse-btn" id="openArchiveBtn">Browse archived</button>
+      <button class="btn btn-sm btn-secondary archive-browse-btn" id="openArchiveBtn">Browse Archived</button>
     </div>
   `;
   board.appendChild(archiveCol);
@@ -765,12 +781,15 @@ function renderBoard() {
       await loadTasks();
       await refreshArchivedCount();
       renderBoard();
+      showClaudeHeart();
     } catch {}
   });
 
   archiveCol.querySelector('#openArchiveBtn').addEventListener('click', () => {
     openArchiveModal();
   });
+
+  initClaudeCharacter();
 
   // Card event listeners
   board.querySelectorAll('.task-card').forEach(card => {
@@ -961,6 +980,7 @@ document.getElementById('archiveTaskBtn').addEventListener('click', async () => 
     await loadTasks();
     await refreshArchivedCount();
     renderBoard();
+    showClaudeHeart();
   } catch (err) {
     alert('Archive error: ' + err.message);
   }
@@ -1110,6 +1130,118 @@ function timeAgo(dateStr) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+/* ── Claude Character ─────────────────────────── */
+let claudeX = 50;
+let claudeDir = 'right';
+let claudeHovered = false;
+let claudeWalkTimer = null;
+let claudeLegTimer = null;
+
+function initClaudeCharacter() {
+  if (claudeWalkTimer) clearInterval(claudeWalkTimer);
+  if (claudeLegTimer) clearInterval(claudeLegTimer);
+  claudeHovered = false;
+
+  claudeWalkTimer = setInterval(() => {
+    if (claudeHovered) return;
+    const newX = 15 + Math.random() * 70;
+    claudeDir = newX > claudeX ? 'right' : 'left';
+    claudeX = newX;
+    updateClaudePos(false);
+  }, 2000);
+
+  claudeLegTimer = setInterval(() => {
+    const legs = document.querySelectorAll('.claude-leg');
+    legs.forEach(leg => {
+      if (Math.random() < 0.3) {
+        leg.setAttribute('height', '13.5');
+        setTimeout(() => leg.setAttribute('height', '15'), 200);
+      }
+    });
+  }, 300);
+
+  const zone = document.getElementById('archiveDropZone');
+  if (zone) {
+    zone.addEventListener('mousemove', onClaudeMouseMove);
+    zone.addEventListener('mouseleave', onClaudeMouseLeave);
+  }
+}
+
+function updateClaudePos(fast) {
+  const el = document.getElementById('claudeCharacter');
+  if (!el) return;
+  if (fast) {
+    el.classList.add('claude-fast');
+  } else {
+    el.classList.remove('claude-fast');
+  }
+  el.style.left = `calc(${claudeX}% - 24px)`;
+  const eyes = el.querySelector('.claude-eyes');
+  if (eyes) {
+    eyes.style.transform = claudeDir === 'right' ? 'translateX(3px)' : 'translateX(-3px)';
+  }
+}
+
+function onClaudeMouseMove(e) {
+  const el = document.getElementById('claudeCharacter');
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const pad = 10;
+  const over = e.clientX >= r.left - pad && e.clientX <= r.right + pad &&
+               e.clientY >= r.top - pad && e.clientY <= r.bottom + pad;
+  if (!over) {
+    if (claudeHovered) {
+      claudeHovered = false;
+      setClaudeEmoji('');
+      el.classList.remove('claude-tremble');
+    }
+    return;
+  }
+  if (!claudeHovered) {
+    claudeHovered = true;
+    setClaudeEmoji('😱');
+  }
+  const cx = r.left + r.width / 2;
+  if (e.clientX <= cx) {
+    claudeX = Math.min(85, claudeX + 35);
+    claudeDir = 'right';
+  } else {
+    claudeX = Math.max(15, claudeX - 35);
+    claudeDir = 'left';
+  }
+  if (claudeX <= 15 || claudeX >= 85) {
+    el.classList.add('claude-tremble');
+  } else {
+    el.classList.remove('claude-tremble');
+  }
+  updateClaudePos(true);
+}
+
+function onClaudeMouseLeave() {
+  claudeHovered = false;
+  setClaudeEmoji('');
+  const el = document.getElementById('claudeCharacter');
+  if (el) el.classList.remove('claude-tremble');
+}
+
+function setClaudeEmoji(emoji) {
+  const el = document.getElementById('claudeEmoji');
+  if (!el) return;
+  el.textContent = emoji;
+  el.className = emoji ? 'claude-emoji visible' : 'claude-emoji';
+}
+
+function showClaudeHeart() {
+  const el = document.getElementById('claudeEmoji');
+  if (!el) return;
+  el.textContent = '❤️';
+  el.className = 'claude-emoji claude-heart';
+  setTimeout(() => {
+    el.className = 'claude-emoji';
+    el.textContent = '';
+  }, 1500);
 }
 
 /* ── Archive ───────────────────────────────────── */

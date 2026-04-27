@@ -792,14 +792,75 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 14px;
-  min-height: 120px;
+  min-height: 180px;
   text-align: center;
+  position: relative;
+  overflow: hidden;
 }
 
 .archive-drop-zone.drag-over {
   background: rgba(99, 102, 241, 0.08);
+}
+
+/* ── Claude Pixel Character ──────────────────── */
+.claude-character-wrapper {
+  position: absolute;
+  top: 6px;
+  z-index: 2;
+  cursor: default;
+  transition: left 0.6s ease-out;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.claude-character-wrapper.claude-fast {
+  transition: left 0.15s ease-out;
+}
+
+.claude-svg {
+  display: block;
+  color: #D4956B;
+}
+
+.claude-eyes {
+  transition: transform 0.2s ease;
+}
+
+.claude-emoji {
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 18px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.claude-emoji.visible {
+  opacity: 1;
+}
+
+.claude-emoji.claude-heart {
+  opacity: 1;
+  animation: claudeHeartFloat 1.5s ease-out forwards;
+}
+
+@keyframes claudeHeartFloat {
+  0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-24px); }
+}
+
+.claude-tremble {
+  animation: claudeTremble 0.08s infinite alternate;
+}
+
+@keyframes claudeTremble {
+  from { transform: translateX(-1.5px); }
+  to { transform: translateX(1.5px); }
 }
 
 .archive-drop-hint {
