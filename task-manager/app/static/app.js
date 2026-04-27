@@ -6,6 +6,11 @@ let columns = [];
 let tasks = [];
 let notifPanelOpen = false;
 let archivedCount = 0;
+let claudeLeftPx = 0;
+let claudeDir = 'left';
+let claudeHovered = false;
+let claudeWalkTimer = null;
+let claudeLegTimer = null;
 
 const TAG_COLORS = [
   '#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6',
@@ -1129,12 +1134,6 @@ function timeAgo(dateStr) {
 }
 
 /* ── Claude Character ─────────────────────────── */
-let claudeLeftPx = 0;
-let claudeDir = 'left';
-let claudeHovered = false;
-let claudeWalkTimer = null;
-let claudeLegTimer = null;
-
 function initClaudeCharacter() {
   if (claudeWalkTimer) clearInterval(claudeWalkTimer);
   if (claudeLegTimer) clearInterval(claudeLegTimer);
