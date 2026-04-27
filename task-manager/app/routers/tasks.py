@@ -268,7 +268,6 @@ def archive_task(
         return task
     task.archived = True
     task.updated_at = datetime.utcnow()
-    _record_history(session, task, "archived", "false", "true", changed_by_id=user_id)
     session.add(task)
     session.commit()
     session.refresh(task)

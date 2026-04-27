@@ -40,76 +40,79 @@
 
   <!-- Task Modal -->
   <div class="modal-overlay" id="taskModal">
-    <div class="modal">
+    <div class="modal modal-wide">
       <h2 id="taskModalTitle">New Task</h2>
       <div id="taskCreatedAt" class="task-meta-date" style="display:none"></div>
       <form id="taskForm">
         <input type="hidden" id="taskId">
         <input type="hidden" id="taskStatus">
-        <div class="form-group">
-          <label for="taskTitle">Title *</label>
-          <input type="text" id="taskTitle" required placeholder="Enter task title">
+        <div class="modal-columns single-col" id="taskModalColumns">
+          <div class="modal-col-left">
+            <div class="form-group">
+              <label for="taskTitle">Title *</label>
+              <input type="text" id="taskTitle" required placeholder="Enter task title">
+            </div>
+            <div class="form-group">
+              <label for="taskDesc">Description</label>
+              <textarea id="taskDesc" placeholder="Task description..."></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="taskPriority">Priority</label>
+                <select id="taskPriority">
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM" selected>Medium</option>
+                  <option value="HIGH">High</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="taskAssignee">Assignee</label>
+                <select id="taskAssignee">
+                  <option value="">Unassigned</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="taskDueDate">Due Date</label>
+                <input type="date" id="taskDueDate">
+              </div>
+              <div class="form-group">
+                <label for="taskTags">Tags (comma separated)</label>
+                <input type="text" id="taskTags" placeholder="UI, Icon, Research">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="taskFigma">Figma URL</label>
+                <input type="url" id="taskFigma" placeholder="https://figma.com/...">
+              </div>
+              <div class="form-group">
+                <label for="taskConfluence">Confluence URL</label>
+                <input type="url" id="taskConfluence" placeholder="https://confluence...">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Cover Image</label>
+              <div class="image-upload-area" id="imageUploadArea">
+                Click to upload image or drag & drop
+                <input type="file" id="imageInput" accept="image/*" style="display:none">
+              </div>
+              <img class="image-preview" id="imagePreview" style="display:none">
+            </div>
+          </div>
+          <div class="modal-col-right" id="taskModalRight" style="display:none">
+            <div class="comments-section" id="commentsSection">
+              <h3>Comments</h3>
+              <div class="comments-scroll" id="commentsList"></div>
+              <div class="comment-input-row" style="position:relative">
+                <input type="text" id="commentInput" placeholder="Add a comment... (use @ to mention)">
+                <button type="button" class="btn btn-sm btn-primary" id="addCommentBtn">Post</button>
+                <div class="mention-dropdown" id="mentionDropdown"></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="taskDesc">Description</label>
-          <textarea id="taskDesc" placeholder="Task description..."></textarea>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="taskPriority">Priority</label>
-            <select id="taskPriority">
-              <option value="LOW">Low</option>
-              <option value="MEDIUM" selected>Medium</option>
-              <option value="HIGH">High</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="taskAssignee">Assignee</label>
-            <select id="taskAssignee">
-              <option value="">Unassigned</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="taskDueDate">Due Date</label>
-            <input type="date" id="taskDueDate">
-          </div>
-          <div class="form-group">
-            <label for="taskTags">Tags (comma separated)</label>
-            <input type="text" id="taskTags" placeholder="UI, Icon, Research">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="taskFigma">Figma URL</label>
-            <input type="url" id="taskFigma" placeholder="https://figma.com/...">
-          </div>
-          <div class="form-group">
-            <label for="taskConfluence">Confluence URL</label>
-            <input type="url" id="taskConfluence" placeholder="https://confluence...">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Cover Image</label>
-          <div class="image-upload-area" id="imageUploadArea">
-            Click to upload image or drag & drop
-            <input type="file" id="imageInput" accept="image/*" style="display:none">
-          </div>
-          <img class="image-preview" id="imagePreview" style="display:none">
-        </div>
-
-        <!-- Comments (only shown when editing) -->
-        <div class="comments-section" id="commentsSection" style="display:none">
-          <h3>Comments</h3>
-          <div id="commentsList"></div>
-          <div class="comment-input-row" style="position:relative">
-            <input type="text" id="commentInput" placeholder="Add a comment... (use @ to mention)">
-            <button type="button" class="btn btn-sm btn-primary" id="addCommentBtn">Post</button>
-            <div class="mention-dropdown" id="mentionDropdown"></div>
-          </div>
-        </div>
-
         <div class="form-actions">
           <button type="button" class="btn btn-danger" id="deleteTaskBtn" style="display:none;margin-right:auto">Delete</button>
           <button type="button" class="btn btn-archive" id="archiveTaskBtn" style="display:none">Archive</button>
@@ -122,72 +125,74 @@
 
   <!-- Report Modal -->
   <div class="modal-overlay" id="reportModal">
-    <div class="modal" style="max-width:720px">
+    <div class="modal modal-wide">
       <h2>Weekly Report</h2>
 
       <!-- LLM Status Banner -->
       <div id="llmStatusBanner" style="display:none;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px"></div>
 
-      <!-- System Prompt Section -->
-      <div class="form-group">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer" id="systemPromptToggle">
-          Agent Instructions (System Prompt)
-          <span style="font-size:11px;color:var(--text-muted)" id="systemPromptToggleIcon">&#9660;</span>
-        </label>
-        <div id="systemPromptSection" style="display:none">
-          <textarea id="systemPrompt" rows="4" placeholder="LLM에게 보낼 시스템 프롬프트를 입력하세요. 보고서 톤, 형식, 언어 등을 지시할 수 있습니다."></textarea>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">LLM이 보고서를 생성할 때 따를 지시사항입니다. 비워두면 기본 프롬프트가 사용됩니다.</div>
-        </div>
-      </div>
+      <div class="modal-columns">
+        <div class="modal-col-left">
+          <!-- System Prompt Section -->
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer" id="systemPromptToggle">
+              Agent Instructions (System Prompt)
+              <span style="font-size:11px;color:var(--text-muted)" id="systemPromptToggleIcon">&#9660;</span>
+            </label>
+            <div id="systemPromptSection" style="display:none">
+              <textarea id="systemPrompt" rows="4" placeholder="LLM에게 보낼 시스템 프롬프트를 입력하세요. 보고서 톤, 형식, 언어 등을 지시할 수 있습니다."></textarea>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px">LLM이 보고서를 생성할 때 따를 지시사항입니다. 비워두면 기본 프롬프트가 사용됩니다.</div>
+            </div>
+          </div>
 
-      <!-- Template Section -->
-      <div class="form-group">
-        <label>Example Report Template</label>
-        <textarea id="reportTemplate" rows="6" placeholder="예시 주간보고서를 붙여넣으세요. LLM이 이 형식을 따라 보고서를 생성합니다."></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button type="button" class="btn btn-sm btn-secondary" id="saveTemplateBtn">Save Template</button>
-          <button type="button" class="btn btn-sm btn-secondary" id="loadTemplateBtn">Load Saved</button>
-        </div>
-      </div>
+          <!-- Template Section -->
+          <div class="form-group">
+            <label>Example Report Template</label>
+            <textarea id="reportTemplate" rows="6" placeholder="예시 주간보고서를 붙여넣으세요. LLM이 이 형식을 따라 보고서를 생성합니다."></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button type="button" class="btn btn-sm btn-secondary" id="saveTemplateBtn">Save Template</button>
+              <button type="button" class="btn btn-sm btn-secondary" id="loadTemplateBtn">Load Saved</button>
+            </div>
+          </div>
 
-      <!-- Period Selection -->
-      <div class="form-row">
-        <div class="form-group">
-          <label>Period (days)</label>
-          <select id="reportDays">
-            <option value="7" selected>Last 7 days</option>
-            <option value="14">Last 14 days</option>
-            <option value="30">Last 30 days</option>
-          </select>
-        </div>
-        <div class="form-group" style="display:flex;align-items:flex-end">
-          <button type="button" class="btn btn-primary" id="generateReportBtn" style="width:100%">Generate Report</button>
-        </div>
-      </div>
+          <!-- Generated Report -->
+          <div class="form-group" id="reportResultGroup" style="display:none">
+            <label>Generated Report</label>
+            <div id="reportResult" class="report-result"></div>
+            <button type="button" class="btn btn-sm btn-secondary" id="copyReportBtn" style="margin-top:8px">Copy to Clipboard</button>
+          </div>
 
-      <!-- Changes Preview -->
-      <div class="form-group" id="changesPreviewGroup" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <label>Task Changes (<span id="changesCount">0</span>)</label>
-          <button type="button" class="btn btn-sm btn-danger" id="clearHistoryBtn" style="font-size:11px;padding:2px 8px">Clear History</button>
+          <!-- Loading -->
+          <div id="reportLoading" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">
+            Generating report...
+          </div>
         </div>
-        <div id="changesPreview" class="changes-preview"></div>
-      </div>
 
-      <!-- Generated Report -->
-      <div class="form-group" id="reportResultGroup" style="display:none">
-        <label>Generated Report</label>
-        <div id="reportResult" class="report-result"></div>
-        <button type="button" class="btn btn-sm btn-secondary" id="copyReportBtn" style="margin-top:8px">Copy to Clipboard</button>
-      </div>
+        <div class="modal-col-right">
+          <!-- Period Selection -->
+          <div class="form-group">
+            <label>Period (days)</label>
+            <select id="reportDays">
+              <option value="7" selected>Last 7 days</option>
+              <option value="14">Last 14 days</option>
+              <option value="30">Last 30 days</option>
+            </select>
+          </div>
 
-      <!-- Loading -->
-      <div id="reportLoading" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">
-        Generating report...
+          <!-- Changes Preview -->
+          <div class="form-group" id="changesPreviewGroup" style="display:none">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <label>Task Changes (<span id="changesCount">0</span>)</label>
+              <button type="button" class="btn btn-sm btn-danger" id="clearHistoryBtn" style="font-size:11px;padding:2px 8px">Clear History</button>
+            </div>
+            <div id="changesPreview" class="changes-preview"></div>
+          </div>
+        </div>
       </div>
 
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" id="closeReportBtn">Close</button>
+        <button type="button" class="btn btn-primary" id="generateReportBtn">Generate Report</button>
       </div>
     </div>
   </div>

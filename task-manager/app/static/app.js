@@ -745,16 +745,6 @@ function renderBoard() {
         <span>Drop here to archive</span>
       </div>
       <button class="btn btn-sm btn-secondary archive-browse-btn" id="openArchiveBtn">Browse archived</button>
-      <div class="archive-claude-character" id="archiveClaude">
-        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-          <circle cx="18" cy="18" r="16" fill="#D4785C" opacity="0.9"/>
-          <ellipse cx="12" cy="15" rx="2.5" ry="3" fill="white"/>
-          <ellipse cx="24" cy="15" rx="2.5" ry="3" fill="white"/>
-          <ellipse cx="12" cy="15.5" rx="1.2" ry="1.5" fill="#2d1a0e"/>
-          <ellipse cx="24" cy="15.5" rx="1.2" ry="1.5" fill="#2d1a0e"/>
-          <path d="M13 23 Q18 27 23 23" stroke="#2d1a0e" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-        </svg>
-      </div>
     </div>
   `;
   board.appendChild(archiveCol);
@@ -772,7 +762,6 @@ function renderBoard() {
     const taskId = parseInt(e.dataTransfer.getData('text/plain'));
     try {
       await api(`/api/tasks/${taskId}/archive`, { method: 'POST' });
-      showArchiveClaude();
       await loadTasks();
       await refreshArchivedCount();
       renderBoard();
@@ -838,7 +827,8 @@ function openTaskModal(task, defaultStatus) {
   const title = document.getElementById('taskModalTitle');
   const form = document.getElementById('taskForm');
   const deleteBtn = document.getElementById('deleteTaskBtn');
-  const commentsSection = document.getElementById('commentsSection');
+  const rightCol = document.getElementById('taskModalRight');
+  const modalColumns = document.getElementById('taskModalColumns');
 
   // Populate assignee dropdown
   const assigneeSelect = document.getElementById('taskAssignee');
@@ -862,7 +852,8 @@ function openTaskModal(task, defaultStatus) {
     document.getElementById('taskConfluence').value = task.confluence_url || '';
     deleteBtn.style.display = 'block';
     archiveBtn.style.display = 'block';
-    commentsSection.style.display = 'block';
+    rightCol.style.display = '';
+    modalColumns.classList.remove('single-col');
     loadComments(task.id);
 
     // Show created_at
@@ -884,7 +875,8 @@ function openTaskModal(task, defaultStatus) {
     document.getElementById('taskStatus').value = defaultStatus || 'TODO';
     deleteBtn.style.display = 'none';
     archiveBtn.style.display = 'none';
-    commentsSection.style.display = 'none';
+    rightCol.style.display = 'none';
+    modalColumns.classList.add('single-col');
     createdAtEl.style.display = 'none';
     document.getElementById('imagePreview').style.display = 'none';
   }
@@ -966,7 +958,6 @@ document.getElementById('archiveTaskBtn').addEventListener('click', async () => 
   try {
     await api(`/api/tasks/${id}/archive`, { method: 'POST' });
     closeTaskModal();
-    showArchiveClaude();
     await loadTasks();
     await refreshArchivedCount();
     renderBoard();
@@ -1129,15 +1120,6 @@ async function refreshArchivedCount() {
     const el = document.getElementById('archiveCount');
     if (el) el.textContent = archivedCount;
   } catch {}
-}
-
-function showArchiveClaude() {
-  const el = document.getElementById('archiveClaude');
-  if (!el) return;
-  el.classList.remove('show');
-  void el.offsetWidth;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 1600);
 }
 
 function openArchiveModal() {
