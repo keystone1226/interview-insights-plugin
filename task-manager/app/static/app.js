@@ -735,46 +735,42 @@ function renderBoard() {
       <span>ARCHIVE</span>
       <span class="count" id="archiveCount">${archivedCount}</span>
     </div>
-    <div class="column-body archive-drop-zone" id="archiveDropZone">
-      <div class="claude-character-wrapper" id="claudeCharacter" style="left:calc(50% - 24px)">
-        <div class="claude-emoji" id="claudeEmoji"></div>
-        <svg class="claude-svg" viewBox="0 0 45 55" width="48" height="58">
-          <rect x="5" y="0" width="10" height="10" fill="currentColor"/>
-          <rect x="30" y="0" width="10" height="10" fill="currentColor"/>
-          <rect x="5" y="10" width="35" height="25" fill="currentColor"/>
-          <g class="claude-eyes">
-            <rect x="10" y="15" width="8" height="8" fill="#1a1a2e"/>
-            <rect x="27" y="15" width="8" height="8" fill="#1a1a2e"/>
-          </g>
-          <rect class="claude-leg" x="5" y="35" width="5" height="15" fill="currentColor"/>
-          <rect class="claude-leg" x="15" y="35" width="5" height="15" fill="currentColor"/>
-          <rect class="claude-leg" x="25" y="35" width="5" height="15" fill="currentColor"/>
-          <rect class="claude-leg" x="35" y="35" width="5" height="15" fill="currentColor"/>
-        </svg>
+    <div class="column-body archive-body" id="archiveDropZone">
+      <div class="claude-walk-area" id="claudeWalkArea">
+        <div class="claude-character-wrapper" id="claudeCharacter">
+          <div class="claude-emoji" id="claudeEmoji"></div>
+          <svg class="claude-svg" viewBox="0 0 120 100">
+            <rect x="30" y="41" width="60" height="44" fill="#E88B5F"/>
+            <rect x="22" y="56" width="8" height="15" fill="#E88B5F"/>
+            <rect x="90" y="56" width="8" height="15" fill="#E88B5F"/>
+            <rect class="claude-leg" x="30" y="85" width="8" height="15" fill="#E88B5F"/>
+            <rect class="claude-leg" x="44" y="85" width="8" height="15" fill="#E88B5F"/>
+            <rect class="claude-leg" x="68" y="85" width="8" height="15" fill="#E88B5F"/>
+            <rect class="claude-leg" x="82" y="85" width="8" height="15" fill="#E88B5F"/>
+            <rect id="claudeEyeL" x="36" y="50" width="8" height="8" fill="#111"/>
+            <rect id="claudeEyeR" x="71" y="50" width="8" height="8" fill="#111"/>
+            <path id="claudeHeartPath" class="claude-heart-path" d="M60.2727 29.2727L51.5114 20.5114C50.8125 19.8125 50.3466 19 50.1136 18.0739C49.8864 17.1477 49.8892 16.2273 50.1222 15.3125C50.3551 14.392 50.8182 13.5909 51.5114 12.9091C52.2216 12.2102 53.0313 11.7472 53.9403 11.5199C54.8551 11.2869 55.767 11.2869 56.6761 11.5199C57.5909 11.7528 58.4034 12.2159 59.1136 12.9091L60.2727 14.0341L61.4318 12.9091C62.1477 12.2159 62.9602 11.7528 63.8693 11.5199C64.7784 11.2869 65.6875 11.2869 66.5966 11.5199C67.5114 11.7472 68.3239 12.2102 69.0341 12.9091C69.7273 13.5909 70.1903 14.392 70.4233 15.3125C70.6563 16.2273 70.6563 17.1477 70.4233 18.0739C70.196 19 69.733 19.8125 69.0341 20.5114L60.2727 29.2727Z" fill="#FF0000" opacity="0"/>
+          </svg>
+        </div>
       </div>
-      <div class="archive-drop-hint" style="margin-top:68px">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="21 8 21 21 3 21 3 8"></polyline>
-          <rect x="1" y="3" width="22" height="5"></rect>
-          <line x1="10" y1="12" x2="14" y2="12"></line>
-        </svg>
-        <span>Drop Here to Archive</span>
+      <div class="archive-drop-target">
+        Drop Here to Archive
       </div>
-      <button class="btn btn-sm btn-secondary archive-browse-btn" id="openArchiveBtn">Browse Archived</button>
+      <button class="btn btn-primary archive-browse-btn" id="openArchiveBtn">Browse Archived</button>
     </div>
   `;
   board.appendChild(archiveCol);
 
-  // Archive drop zone
-  const archiveZone = archiveCol.querySelector('.archive-drop-zone');
-  archiveZone.addEventListener('dragover', e => {
+  // Archive drag-drop on entire body
+  const archiveBody = archiveCol.querySelector('.archive-body');
+  archiveBody.addEventListener('dragover', e => {
     e.preventDefault();
-    archiveZone.classList.add('drag-over');
+    archiveBody.classList.add('drag-over');
   });
-  archiveZone.addEventListener('dragleave', () => archiveZone.classList.remove('drag-over'));
-  archiveZone.addEventListener('drop', async e => {
+  archiveBody.addEventListener('dragleave', () => archiveBody.classList.remove('drag-over'));
+  archiveBody.addEventListener('drop', async e => {
     e.preventDefault();
-    archiveZone.classList.remove('drag-over');
+    archiveBody.classList.remove('drag-over');
     const taskId = parseInt(e.dataTransfer.getData('text/plain'));
     try {
       await api(`/api/tasks/${taskId}/archive`, { method: 'POST' });
@@ -1133,8 +1129,8 @@ function timeAgo(dateStr) {
 }
 
 /* ── Claude Character ─────────────────────────── */
-let claudeX = 50;
-let claudeDir = 'right';
+let claudeLeftPx = 0;
+let claudeDir = 'left';
 let claudeHovered = false;
 let claudeWalkTimer = null;
 let claudeLegTimer = null;
@@ -1144,17 +1140,32 @@ function initClaudeCharacter() {
   if (claudeLegTimer) clearInterval(claudeLegTimer);
   claudeHovered = false;
 
+  const walkArea = document.getElementById('claudeWalkArea');
+  const el = document.getElementById('claudeCharacter');
+  if (!walkArea || !el) return;
+
+  const charW = el.offsetWidth || 60;
+  const maxLeft = walkArea.offsetWidth - charW;
+  claudeLeftPx = Math.random() * Math.max(0, maxLeft);
+  el.style.left = claudeLeftPx + 'px';
+  updateClaudeEyes();
+
   claudeWalkTimer = setInterval(() => {
     if (claudeHovered) return;
-    const newX = 15 + Math.random() * 70;
-    claudeDir = newX > claudeX ? 'right' : 'left';
-    claudeX = newX;
-    updateClaudePos(false);
+    const area = document.getElementById('claudeWalkArea');
+    const ch = document.getElementById('claudeCharacter');
+    if (!area || !ch) return;
+    const max = area.offsetWidth - (ch.offsetWidth || 60);
+    const newLeft = Math.random() * Math.max(0, max);
+    claudeDir = newLeft > claudeLeftPx ? 'right' : 'left';
+    claudeLeftPx = newLeft;
+    ch.classList.remove('claude-fast');
+    ch.style.left = claudeLeftPx + 'px';
+    updateClaudeEyes();
   }, 2000);
 
   claudeLegTimer = setInterval(() => {
-    const legs = document.querySelectorAll('.claude-leg');
-    legs.forEach(leg => {
+    document.querySelectorAll('.claude-leg').forEach(leg => {
       if (Math.random() < 0.3) {
         leg.setAttribute('height', '13.5');
         setTimeout(() => leg.setAttribute('height', '15'), 200);
@@ -1162,31 +1173,27 @@ function initClaudeCharacter() {
     });
   }, 300);
 
-  const zone = document.getElementById('archiveDropZone');
-  if (zone) {
-    zone.addEventListener('mousemove', onClaudeMouseMove);
-    zone.addEventListener('mouseleave', onClaudeMouseLeave);
-  }
+  walkArea.addEventListener('mousemove', onClaudeMouseMove);
+  walkArea.addEventListener('mouseleave', onClaudeMouseLeave);
 }
 
-function updateClaudePos(fast) {
-  const el = document.getElementById('claudeCharacter');
-  if (!el) return;
-  if (fast) {
-    el.classList.add('claude-fast');
+function updateClaudeEyes() {
+  const eyeL = document.getElementById('claudeEyeL');
+  const eyeR = document.getElementById('claudeEyeR');
+  if (!eyeL || !eyeR) return;
+  if (claudeDir === 'right') {
+    eyeL.setAttribute('x', '42');
+    eyeR.setAttribute('x', '76');
   } else {
-    el.classList.remove('claude-fast');
-  }
-  el.style.left = `calc(${claudeX}% - 24px)`;
-  const eyes = el.querySelector('.claude-eyes');
-  if (eyes) {
-    eyes.style.transform = claudeDir === 'right' ? 'translateX(3px)' : 'translateX(-3px)';
+    eyeL.setAttribute('x', '36');
+    eyeR.setAttribute('x', '71');
   }
 }
 
 function onClaudeMouseMove(e) {
   const el = document.getElementById('claudeCharacter');
-  if (!el) return;
+  const walkArea = document.getElementById('claudeWalkArea');
+  if (!el || !walkArea) return;
   const r = el.getBoundingClientRect();
   const pad = 10;
   const over = e.clientX >= r.left - pad && e.clientX <= r.right + pad &&
@@ -1203,20 +1210,24 @@ function onClaudeMouseMove(e) {
     claudeHovered = true;
     setClaudeEmoji('😱');
   }
+  const charW = el.offsetWidth || 60;
+  const max = walkArea.offsetWidth - charW;
   const cx = r.left + r.width / 2;
   if (e.clientX <= cx) {
-    claudeX = Math.min(85, claudeX + 35);
+    claudeLeftPx = Math.min(max, claudeLeftPx + max * 0.4);
     claudeDir = 'right';
   } else {
-    claudeX = Math.max(15, claudeX - 35);
+    claudeLeftPx = Math.max(0, claudeLeftPx - max * 0.4);
     claudeDir = 'left';
   }
-  if (claudeX <= 15 || claudeX >= 85) {
+  if (claudeLeftPx <= 2 || claudeLeftPx >= max - 2) {
     el.classList.add('claude-tremble');
   } else {
     el.classList.remove('claude-tremble');
   }
-  updateClaudePos(true);
+  el.classList.add('claude-fast');
+  el.style.left = claudeLeftPx + 'px';
+  updateClaudeEyes();
 }
 
 function onClaudeMouseLeave() {
@@ -1234,13 +1245,15 @@ function setClaudeEmoji(emoji) {
 }
 
 function showClaudeHeart() {
-  const el = document.getElementById('claudeEmoji');
-  if (!el) return;
-  el.textContent = '❤️';
-  el.className = 'claude-emoji claude-heart';
+  const heart = document.getElementById('claudeHeartPath');
+  if (!heart) return;
+  heart.classList.remove('show');
+  heart.style.opacity = '0';
+  void heart.offsetWidth;
+  heart.classList.add('show');
   setTimeout(() => {
-    el.className = 'claude-emoji';
-    el.textContent = '';
+    heart.classList.remove('show');
+    heart.style.opacity = '0';
   }, 1500);
 }
 
