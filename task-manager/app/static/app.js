@@ -872,8 +872,8 @@ function openTaskModal(task, defaultStatus) {
     document.getElementById('taskConfluence').value = task.confluence_url || '';
     deleteBtn.style.display = 'block';
     archiveBtn.style.display = 'block';
-    rightCol.style.display = '';
-    modalColumns.classList.remove('single-col');
+    if (rightCol) rightCol.style.display = '';
+    if (modalColumns) modalColumns.classList.remove('single-col');
     loadComments(task.id);
 
     // Show created_at
@@ -895,8 +895,8 @@ function openTaskModal(task, defaultStatus) {
     document.getElementById('taskStatus').value = defaultStatus || 'TODO';
     deleteBtn.style.display = 'none';
     archiveBtn.style.display = 'none';
-    rightCol.style.display = 'none';
-    modalColumns.classList.add('single-col');
+    if (rightCol) rightCol.style.display = 'none';
+    if (modalColumns) modalColumns.classList.add('single-col');
     createdAtEl.style.display = 'none';
     document.getElementById('imagePreview').style.display = 'none';
   }
