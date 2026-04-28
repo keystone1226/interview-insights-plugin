@@ -1,5 +1,6 @@
 """Task CRUD routes."""
 
+import json
 import re
 import uuid
 from datetime import datetime, timedelta
@@ -7,6 +8,7 @@ from pathlib import Path
 
 import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.config import UPLOAD_DIR
@@ -336,3 +338,78 @@ def archived_task_count(
         query = query.where(Task.workspace_id.is_(None))
     count = len(session.exec(query).all())
     return {"count": count}
+
+
+# ── AI Task Generation ────────────────────────────
+
+
+DEFAULT_TASK_GEN_PROMPT = (
+    "당신은 프로젝트 매니저 어시스턴트입니다. 사용자가 입력한 목표/과업을 팀원들이 바로 착수할 수 있는 작은 단위의 일감으로 분해해주세요.\n\n"
+    "규칙:\n"
+    "1. 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트나 마크다운을 포함하지 마세요.\n"
+    "2. 각 일감은 독립적으로 수행 가능한 단위여야 합니다.\n"
+    "3. 제목은 구체적이고 행동 중심(동사로 시작)으로 작성하세요.\n"
+    "4. 설명은 1-2문장으로 무엇을 해야 하는지, 왜 필요한지 간결하게 적으세요.\n"
+    "5. 우선순위는 HIGH, MEDIUM, LOW 중 하나를 선택하세요.\n"
+    "6. 일감 수는 목표 규모에 맞게 5~15개 사이로 생성하세요.\n\n"
+    '응답 형식:\n'
+    '[{"title": "일감 제목", "description": "일감 설명", "priority": "MEDIUM"}, ...]'
+)
+
+
+class TaskGenerateRequest(BaseModel):
+    goal: str
+    system_prompt: str | None = None
+    reject_items: list[dict] | None = None
+
+
+@router.post("/generate")
+async def generate_tasks(data: TaskGenerateRequest):
+    from app.services.llm import chat_completion, is_llm_configured
+
+    if not is_llm_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="LLM API가 설정되지 않았습니다. 환경변수 TASK_LLM_* 을 설정하세요.",
+        )
+
+    system_prompt = data.system_prompt or DEFAULT_TASK_GEN_PROMPT
+
+    user_content = f"## 목표\n{data.goal}"
+    if data.reject_items:
+        reject_text = json.dumps(data.reject_items, ensure_ascii=False)
+        user_content += (
+            f"\n\n## 제외할 항목 (이 일감들은 적절하지 않으므로 대체 일감을 생성하세요)\n{reject_text}"
+        )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_content},
+    ]
+
+    try:
+        raw = await chat_completion(messages, temperature=0.7, max_tokens=4096)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    # Extract JSON array from response
+    try:
+        start = raw.index("[")
+        end = raw.rindex("]") + 1
+        items = json.loads(raw[start:end])
+    except (ValueError, json.JSONDecodeError):
+        raise HTTPException(
+            status_code=502,
+            detail=f"LLM 응답을 파싱할 수 없습니다. 시스템 프롬프트에서 JSON 형식을 요구하세요.\n\n응답:\n{raw[:500]}",
+        )
+
+    valid = []
+    for item in items:
+        if isinstance(item, dict) and "title" in item:
+            valid.append({
+                "title": str(item["title"]),
+                "description": str(item.get("description", "")),
+                "priority": str(item.get("priority", "MEDIUM")).upper(),
+            })
+
+    return {"items": valid}

@@ -11,6 +11,8 @@ let claudeDir = 'left';
 let claudeHovered = false;
 let claudeWalkTimer = null;
 let claudeLegTimer = null;
+let claudeClickTimes = [];
+let taskGenItems = [];
 
 const TAG_COLORS = [
   '#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6',
@@ -1174,6 +1176,16 @@ function initClaudeCharacter() {
 
   walkArea.addEventListener('mousemove', onClaudeMouseMove);
   walkArea.addEventListener('mouseleave', onClaudeMouseLeave);
+
+  el.addEventListener('click', () => {
+    const now = Date.now();
+    claudeClickTimes.push(now);
+    claudeClickTimes = claudeClickTimes.filter(t => now - t < 1000);
+    if (claudeClickTimes.length >= 3) {
+      claudeClickTimes = [];
+      openTaskGenModal();
+    }
+  });
 }
 
 function updateClaudeEyes() {
@@ -1255,6 +1267,223 @@ function showClaudeHeart() {
     heart.style.opacity = '0';
   }, 1500);
 }
+
+/* ── Task Generator (Easter Egg) ──────────────── */
+
+const DEFAULT_TASK_GEN_PROMPT = `당신은 프로젝트 매니저 어시스턴트입니다. 사용자가 입력한 목표/과업을 팀원들이 바로 착수할 수 있는 작은 단위의 일감으로 분해해주세요.
+
+규칙:
+1. 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트나 마크다운을 포함하지 마세요.
+2. 각 일감은 독립적으로 수행 가능한 단위여야 합니다.
+3. 제목은 구체적이고 행동 중심(동사로 시작)으로 작성하세요.
+4. 설명은 1-2문장으로 무엇을 해야 하는지, 왜 필요한지 간결하게 적으세요.
+5. 우선순위는 HIGH, MEDIUM, LOW 중 하나를 선택하세요.
+6. 일감 수는 목표 규모에 맞게 5~15개 사이로 생성하세요.
+
+응답 형식:
+[{"title": "일감 제목", "description": "일감 설명", "priority": "MEDIUM"}, ...]`;
+
+function openTaskGenModal() {
+  const modal = document.getElementById('taskGenModal');
+  const sysPromptEl = document.getElementById('taskGenSysPrompt');
+  if (sysPromptEl && !sysPromptEl.value) {
+    sysPromptEl.value = DEFAULT_TASK_GEN_PROMPT;
+  }
+  modal.classList.add('active');
+  document.getElementById('taskGenGoal').focus();
+}
+
+function closeTaskGenModal() {
+  document.getElementById('taskGenModal').classList.remove('active');
+}
+
+function renderTaskGenItems() {
+  const list = document.getElementById('taskGenList');
+  const priorityColors = { HIGH: 'var(--high)', MEDIUM: 'var(--medium)', LOW: 'var(--low)' };
+  const priorityBgs = { HIGH: 'rgba(239,68,68,0.15)', MEDIUM: 'rgba(245,158,11,0.15)', LOW: 'rgba(107,114,128,0.15)' };
+
+  list.innerHTML = taskGenItems.map((item, i) => `
+    <div class="task-gen-item ${item.checked ? '' : 'unchecked'}" data-idx="${i}">
+      <div class="task-gen-item-header">
+        <input type="checkbox" ${item.checked ? 'checked' : ''} data-gen-check="${i}">
+        <div class="task-gen-item-body">
+          <input type="text" class="task-gen-item-title" value="${escHtml(item.title)}" data-gen-title="${i}">
+          <textarea class="task-gen-item-desc" rows="1" data-gen-desc="${i}">${escHtml(item.description || '')}</textarea>
+          <span class="task-gen-item-priority" style="color:${priorityColors[item.priority] || priorityColors.MEDIUM};background:${priorityBgs[item.priority] || priorityBgs.MEDIUM}">${item.priority || 'MEDIUM'}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('[data-gen-check]').forEach(cb => {
+    cb.addEventListener('change', e => {
+      const idx = parseInt(e.target.dataset.genCheck);
+      taskGenItems[idx].checked = e.target.checked;
+      e.target.closest('.task-gen-item').classList.toggle('unchecked', !e.target.checked);
+      updateTaskGenCounts();
+    });
+  });
+
+  list.querySelectorAll('[data-gen-title]').forEach(el => {
+    el.addEventListener('input', e => {
+      taskGenItems[parseInt(e.target.dataset.genTitle)].title = e.target.value;
+    });
+  });
+
+  list.querySelectorAll('[data-gen-desc]').forEach(el => {
+    el.addEventListener('input', e => {
+      taskGenItems[parseInt(e.target.dataset.genDesc)].description = e.target.value;
+      e.target.style.height = 'auto';
+      e.target.style.height = e.target.scrollHeight + 'px';
+    });
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  });
+
+  updateTaskGenCounts();
+}
+
+function updateTaskGenCounts() {
+  const checked = taskGenItems.filter(i => i.checked).length;
+  const total = taskGenItems.length;
+  document.getElementById('taskGenSelectedCount').textContent = checked;
+  document.getElementById('taskGenSelectAll').checked = checked === total;
+  const createBtn = document.getElementById('taskGenCreateBtn');
+  createBtn.textContent = `Create Selected (${checked})`;
+  createBtn.disabled = checked === 0;
+}
+
+document.getElementById('taskGenCloseBtn').addEventListener('click', closeTaskGenModal);
+
+document.getElementById('taskGenSysPromptToggle').addEventListener('click', () => {
+  const section = document.getElementById('taskGenSysPromptSection');
+  const icon = document.getElementById('taskGenSysPromptIcon');
+  const visible = section.style.display !== 'none';
+  section.style.display = visible ? 'none' : 'block';
+  icon.innerHTML = visible ? '&#9660;' : '&#9650;';
+});
+
+document.getElementById('taskGenSelectAll').addEventListener('change', e => {
+  const checked = e.target.checked;
+  taskGenItems.forEach(item => item.checked = checked);
+  renderTaskGenItems();
+});
+
+document.getElementById('taskGenRunBtn').addEventListener('click', async () => {
+  const goal = document.getElementById('taskGenGoal').value.trim();
+  if (!goal) return;
+
+  const sysPrompt = document.getElementById('taskGenSysPrompt').value.trim();
+  const loading = document.getElementById('taskGenLoading');
+  const runBtn = document.getElementById('taskGenRunBtn');
+  const resultEmpty = document.getElementById('taskGenResultEmpty');
+  const resultArea = document.getElementById('taskGenResultArea');
+
+  loading.style.display = 'block';
+  runBtn.disabled = true;
+
+  try {
+    const res = await api('/api/tasks/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        goal,
+        system_prompt: sysPrompt || null,
+      }),
+    });
+    taskGenItems = (res.items || []).map(item => ({ ...item, checked: true }));
+    resultEmpty.style.display = 'none';
+    resultArea.style.display = 'block';
+    document.getElementById('taskGenRefreshBtn').style.display = '';
+    document.getElementById('taskGenCreateBtn').style.display = '';
+    renderTaskGenItems();
+  } catch (err) {
+    alert('일감 생성 실패: ' + (err.message || err));
+  } finally {
+    loading.style.display = 'none';
+    runBtn.disabled = false;
+  }
+});
+
+document.getElementById('taskGenRefreshBtn').addEventListener('click', async () => {
+  const unchecked = taskGenItems.filter(i => !i.checked);
+  if (unchecked.length === 0) {
+    alert('재생성할 항목이 없습니다. 체크 해제된 항목만 재생성됩니다.');
+    return;
+  }
+
+  const goal = document.getElementById('taskGenGoal').value.trim();
+  const sysPrompt = document.getElementById('taskGenSysPrompt').value.trim();
+  const loading = document.getElementById('taskGenLoading');
+  const refreshBtn = document.getElementById('taskGenRefreshBtn');
+
+  loading.style.display = 'block';
+  refreshBtn.disabled = true;
+
+  try {
+    const res = await api('/api/tasks/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        goal,
+        system_prompt: sysPrompt || null,
+        reject_items: unchecked.map(i => ({ title: i.title, description: i.description })),
+      }),
+    });
+    const kept = taskGenItems.filter(i => i.checked);
+    const newItems = (res.items || []).map(item => ({ ...item, checked: true }));
+    taskGenItems = [...kept, ...newItems];
+    renderTaskGenItems();
+  } catch (err) {
+    alert('재생성 실패: ' + (err.message || err));
+  } finally {
+    loading.style.display = 'none';
+    refreshBtn.disabled = false;
+  }
+});
+
+document.getElementById('taskGenCreateBtn').addEventListener('click', async () => {
+  const selected = taskGenItems.filter(i => i.checked);
+  if (selected.length === 0) return;
+
+  const createBtn = document.getElementById('taskGenCreateBtn');
+  createBtn.disabled = true;
+  createBtn.textContent = 'Creating...';
+
+  let created = 0;
+  for (const item of selected) {
+    try {
+      await api('/api/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: item.title,
+          description: item.description || '',
+          priority: item.priority || 'MEDIUM',
+          status: 'TODO',
+        }),
+      });
+      created++;
+    } catch (err) {
+      console.error('Failed to create task:', item.title, err);
+    }
+  }
+
+  taskGenItems = taskGenItems.filter(i => !i.checked);
+  if (taskGenItems.length === 0) {
+    document.getElementById('taskGenResultArea').style.display = 'none';
+    document.getElementById('taskGenResultEmpty').style.display = 'block';
+    document.getElementById('taskGenRefreshBtn').style.display = 'none';
+    document.getElementById('taskGenCreateBtn').style.display = 'none';
+  } else {
+    renderTaskGenItems();
+  }
+
+  createBtn.disabled = false;
+  updateTaskGenCounts();
+
+  await loadTasks();
+  renderBoard();
+
+  alert(`${created}개의 태스크가 생성되었습니다.`);
+});
 
 /* ── Archive ───────────────────────────────────── */
 async function refreshArchivedCount() {
