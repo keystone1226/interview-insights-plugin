@@ -48,32 +48,31 @@ python -m app                     # 서버 실행 (기본 포트 8000)
 - **워크스페이스 단위 칸반 보드** — TODO / IN_PROGRESS / REVIEW / DONE 기본 컬럼, 드래그앤드롭 이동
 - **태스크 관리** — 담당자/우선순위/마감일/태그/Figma·Confluence 링크/커버 이미지
 - **댓글 & 멘션 알림** — `@닉네임` 자동완성, 헤더 종 아이콘 알림 패널
-- **주간 보고서 자동 생성** — LLM(FabriX)으로 기간 내 변동사항 요약, 시스템 프롬프트/예시 템플릿 저장 가능
+- **태스크 아카이브** — 완료된 태스크를 아카이브 컬럼으로 드래그, 키워드/담당자/기간별 검색
+- **AI 주간 보고서** — LLM(FabriX)으로 기간 내 변동사항 요약, 시스템 프롬프트/예시 템플릿 저장 가능
+- **AI 일감 분해** — 목표/과업을 입력하면 LLM이 작은 단위의 일감으로 자동 분해, 선택적으로 생성 가능
+- **다크 테마 UI** — 2단 레이아웃 모달, 인라인 수정
 - **워크스페이스 백업/복원** — Markdown(`.md`) 또는 SQLite DB 파일 직접 백업/복원
 - **워크스페이스 비밀번호 보호** — PBKDF2-SHA256(120k iter) 해시, 세션 캐시, 자물쇠 배지 UI
-- **관리자 CLI** — 비밀번호 분실 시 서버에서 리셋
+- **관리자 CLI** — 비밀번호 리셋, 워크스페이스 목록, 사용 통계
 
 ---
 
-## 관리자 CLI (비밀번호 분실 시)
-
-워크스페이스 비밀번호는 단방향 해시로 저장되어 복호화할 수 없습니다. 대신 서버 관리자가 CLI로 직접 리셋할 수 있습니다.
+## 관리자 CLI
 
 ```bash
 # 전체 워크스페이스 목록 + password_hash 조회
 python -m app list-workspaces
+
+# 사용 통계 (DAU, 퍼널, 이탈, 참여도)
+python -m app stats
 
 # 특정 워크스페이스 비밀번호 해제
 python -m app reset-password 3 --clear
 
 # 대화형 입력으로 새 비밀번호 설정 (권장 — 셸 히스토리에 남지 않음)
 python -m app reset-password 3
-
-# 스크립트에서 직접 값 전달 (히스토리에 남으므로 지양)
-python -m app reset-password 3 --new-password 'new-secret'
 ```
-
-`reset-password`는 기본적으로 `getpass` 대화형 입력을 사용하고, 확인을 한 번 더 받습니다.
 
 ---
 
@@ -82,7 +81,7 @@ python -m app reset-password 3 --new-password 'new-secret'
 - Python 3.10+ / FastAPI / SQLModel / Alembic
 - 순수 HTML/CSS/JS 프론트엔드 (빌드 과정·CDN 불필요)
 - SQLite (설정 없이 파일 한 개로 동작)
-- 선택: FabriX LLM (주간보고서 생성), SMTP (이메일 알림)
+- 선택: FabriX LLM (주간보고서·일감 분해), SMTP (이메일 알림)
 
 ---
 
