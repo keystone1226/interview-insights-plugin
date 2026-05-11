@@ -145,6 +145,25 @@ def _seed_onboarding_tasks(session: Session, workspace_id: int) -> None:
         session.add(task)
 
 
+def _purge_onboarding_tasks(session: Session, workspace_id: int) -> int:
+    """Delete all onboarding-tagged tasks (and their comments) in a workspace."""
+    removed = 0
+    tasks = session.exec(
+        select(Task).where(Task.workspace_id == workspace_id)
+    ).all()
+    for t in tasks:
+        try:
+            tag_list = json.loads(t.tags) if t.tags else []
+        except (json.JSONDecodeError, TypeError):
+            tag_list = []
+        if "onboarding" in tag_list:
+            for c in session.exec(select(Comment).where(Comment.task_id == t.id)).all():
+                session.delete(c)
+            session.delete(t)
+            removed += 1
+    return removed
+
+
 @router.post("", response_model=WorkspaceRead, status_code=201)
 def create_workspace(
     data: WorkspaceCreate,
@@ -265,6 +284,26 @@ def delete_workspace(
     # 7. Workspace itself
     session.delete(workspace)
     session.commit()
+
+
+@router.post("/{workspace_id}/reseed-onboarding")
+def reseed_onboarding(
+    workspace_id: int,
+    session: Session = Depends(get_session),
+):
+    """Wipe onboarding-tagged tasks in a workspace and reseed the four guides.
+
+    Used by the "Restart onboarding" action in the Help modal so the tour
+    always starts from a clean slate.
+    """
+    workspace = session.get(Workspace, workspace_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    removed = _purge_onboarding_tasks(session, workspace_id)
+    session.commit()
+    _seed_onboarding_tasks(session, workspace_id)
+    session.commit()
+    return {"ok": True, "removed": removed, "seeded": len(_ONBOARDING_TASKS)}
 
 
 @router.post("/{workspace_id}/join")

@@ -299,9 +299,12 @@
   <!-- Help Modal -->
   <div class="modal-overlay" id="helpModal">
     <div class="modal" style="max-width:760px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:8px">
         <h2 style="margin-bottom:0">Help</h2>
-        <button class="btn btn-sm btn-secondary" id="closeHelpBtn">Close</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm btn-primary" id="restartOnboardingBtn">🎓 온보딩 다시 보기</button>
+          <button class="btn btn-sm btn-secondary" id="closeHelpBtn">Close</button>
+        </div>
       </div>
       <div id="helpContent" class="help-content"></div>
     </div>

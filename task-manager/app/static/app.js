@@ -803,7 +803,18 @@ function renderBoard() {
     card.addEventListener('dragend', () => card.classList.remove('dragging'));
     card.addEventListener('click', () => {
       const task = tasks.find(t => t.id === parseInt(card.dataset.id));
-      if (task) openTaskModal(task);
+      if (!task) return;
+      // Clicking a still-present onboarding task resumes the tour at the
+      // matching step instead of opening the regular task modal.
+      if (
+        typeof Onboarding !== 'undefined' &&
+        Onboarding.isOnboardingTaskTitle(task.title) &&
+        parseTags(task.tags).includes('onboarding')
+      ) {
+        Onboarding.startAtKey(Onboarding.stepKeyForTaskTitle(task.title));
+        return;
+      }
+      openTaskModal(task);
     });
   });
 }
@@ -1880,6 +1891,20 @@ document.getElementById('closeHelpBtn').addEventListener('click', () => {
 // Help modal is read-only, but we keep the same rule for consistency:
 // only the Close button dismisses it.
 
+document.getElementById('restartOnboardingBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('restartOnboardingBtn');
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = '...';
+  try {
+    document.getElementById('helpModal').classList.remove('active');
+    await Onboarding.restart();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+});
+
 function renderMarkdown(md) {
   const lines = md.split('\n');
   let html = '';
@@ -1994,10 +2019,29 @@ const Onboarding = (() => {
   let scrollHandler = null;
   let currentTargetGetter = null;
 
-  // Step definitions. Each step targets either a CSS selector (resolved each
-  // re-layout), a function returning an element, or null for "no target".
+  // Step keys are used to map onboarding task cards → the step where the
+  // user can resume after closing the tour mid-way.
+  const STEP_WELCOME = 'welcome';
+  const STEP_COLUMNS = 'columns';
+  const STEP_ADD_TASK = 'add_task';
+  const STEP_NOTIF = 'notif';
+  const STEP_ARCHIVE = 'archive';
+  const STEP_WEEKLY = 'weekly';
+  const STEP_QUIZ = 'quiz';
+  const STEP_FAREWELL = 'farewell';
+
+  // Mapping: onboarding task title → the step key that introduces that topic.
+  const TITLE_TO_STEP = {
+    '일감 생성하기': STEP_COLUMNS,
+    '일감 아카이브 해보기': STEP_ARCHIVE,
+    'AI에게 주간보고 요청하기': STEP_WEEKLY,
+    'Task Generator 사용하기 (퀴즈)': STEP_QUIZ,
+  };
+
+  // Step definitions.
   const steps = [
     {
+      key: STEP_WELCOME,
       title: '환영합니다 👋',
       body:
         '안녕하세요. Task 관리와 주간보고를 동시에 쓸 수 있는 Task Manager에 오신걸 환영합니다.\n\n' +
@@ -2006,6 +2050,7 @@ const Onboarding = (() => {
       target: null,
     },
     {
+      key: STEP_COLUMNS,
       body:
         '이 화면이 칸반 보드입니다.\n' +
         '• TODO — 아직 시작 안 한 일\n' +
@@ -2017,18 +2062,21 @@ const Onboarding = (() => {
       target: () => document.querySelector('#board .column'),
     },
     {
+      key: STEP_ADD_TASK,
       body:
         '컬럼 하단의 "+ Add Task" 버튼으로 새 일감을 만들 수 있습니다.\n' +
         '제목, 우선순위, 담당자, 마감일, 태그, 커버 이미지까지 자유롭게 채울 수 있어요.',
       target: () => document.querySelector('.add-task-btn'),
     },
     {
+      key: STEP_NOTIF,
       body:
         '댓글에서 @닉네임으로 팀원을 멘션하면 우측 상단의 🔔로 알림이 전달됩니다.\n' +
         '개인 일감 관리부터 팀 협업까지 모두 한 화면에서 처리할 수 있어요.',
       target: () => document.getElementById('notifBell'),
     },
     {
+      key: STEP_ARCHIVE,
       body:
         '완료된 일감은 ARCHIVE로 옮겨 보드를 깔끔하게 유지하세요.\n\n' +
         '카드를 우측 ARCHIVE 영역으로 드래그하거나, 일감을 열고 "Archive" 버튼을 누르면 됩니다.\n' +
@@ -2036,6 +2084,7 @@ const Onboarding = (() => {
       target: () => document.querySelector('.archive-body'),
     },
     {
+      key: STEP_WEEKLY,
       body:
         '상단 "Weekly Report" 버튼을 누르면 LLM이 한 주 동안의 일감 변동, 댓글, 상태 변화를 종합해 ' +
         '주간보고서를 자동으로 작성해 줍니다.\n\n' +
@@ -2044,79 +2093,97 @@ const Onboarding = (() => {
       target: () => document.getElementById('reportBtn'),
     },
     {
+      key: STEP_QUIZ,
       body:
         '마지막은 깜짝 퀴즈입니다 🎉\n\n' +
         'Task Generator는 큰 목표를 LLM이 잘게 나눠 여러 일감으로 만들어주는 이스터에그예요. ' +
-        '어디에 숨어있을까요? 보기에서 골라보세요.',
+        '한 보기만 정답입니다. 골라보세요.',
       target: null,
       quiz: {
-        question: 'Task Generator를 여는 방법은?',
+        // Three deliberately similar-length options. The correct one does NOT
+        // describe the actual mechanism — that hint is only revealed after a
+        // wrong click.
         options: [
-          {
-            label: '🛸  ARCHIVE 컬럼 안의 외계인 캐릭터를 1초 안에 3번 빠르게 클릭',
-            correct: true,
-            feedback:
-              '정답! 아카이브 안의 작은 외계인 친구를 따다닥 3번 클릭하면 Task Generator가 열립니다. ' +
-              '한 번 시도해보세요.',
-          },
-          {
-            label: '⚙️  헤더의 톱니바퀴를 길게 눌러 메뉴에서 선택',
-            correct: false,
-            feedback: '땡! 사실 톱니바퀴 자체가 없어요 😅 다시 골라보세요.',
-          },
-          {
-            label: '⌨️  Ctrl+Shift+G 단축키 입력',
-            correct: false,
-            feedback: '아쉽! 단축키는 아니에요. 외계인을 잘 살펴보세요 👽',
-          },
+          { label: 'A. 알 수 없는 어딘가에 잘 숨어있다',           correct: true  },
+          { label: 'B. 우측 상단의 메뉴 어딘가에 있다',             correct: false },
+          { label: 'C. 키보드 단축키로 열 수 있다',                 correct: false },
         ],
+        // Shown only after a wrong click. The first wrong answer reveals the
+        // real answer; subsequent wrong clicks just repeat the hint.
+        reveal:
+          '정답은 A 였어요. 사실 정답은 — ARCHIVE 컬럼 안의 작은 외계인 친구를 ' +
+          '1초 안에 3번 따다닥 클릭하면 Task Generator가 열립니다 👽',
+        // Shown when the user picks the correct option on the first try.
+        praise: '정답입니다 🎉 비밀은 직접 발견해보는 재미가 있어요. 한 번 찾아보세요.',
       },
     },
     {
+      key: STEP_FAREWELL,
       title: '이제 준비 완료! 🚀',
       body:
         '온보딩은 여기까지에요.\n\n' +
-        '왼쪽에 남아있는 4개의 온보딩 일감은 그대로 두었으니 직접 드래그·아카이브·삭제하며 익혀보세요. ' +
-        '도움말은 언제든 우측 상단 ? 버튼에서 다시 볼 수 있습니다.',
+        '왼쪽 TODO에 남은 온보딩 일감을 다시 클릭하면 해당 단계부터 이어서 볼 수 있고, ' +
+        '처음부터 다시 보고 싶으면 우측 상단 ? 버튼의 "온보딩 다시 보기"를 누르세요.\n\n' +
+        '아래 "확인"을 누르면 온보딩이 종료됩니다.',
       target: null,
-      finalLabel: '시작하기',
+      finalLabel: '확인',
     },
   ];
 
-  function shouldStart() {
-    if (!currentUser || !currentWorkspace) return false;
-    // Backend says onboarded_at is set → skip
-    if (currentUser.onboarded_at) return false;
-    // localStorage flag → skip
-    const flag = `taskmanager_onboarded_${currentUser.id}`;
-    if (localStorage.getItem(flag) === '1') return false;
-    // Only show when this workspace actually has the seeded onboarding tasks
-    const hasOnboardingTasks = tasks.some(t => {
+  function stepIndexByKey(key) {
+    return steps.findIndex(s => s.key === key);
+  }
+
+  function hasOnboardingTask() {
+    return tasks.some(t => {
       try {
-        const tags = parseTags(t.tags);
-        return tags.includes('onboarding');
+        return parseTags(t.tags).includes('onboarding');
       } catch {
         return false;
       }
     });
-    return hasOnboardingTasks;
   }
 
-  function start() {
+  function shouldAutoStart() {
+    if (!currentUser || !currentWorkspace) return false;
+    if (currentUser.onboarded_at) return false;
+    const flag = `taskmanager_onboarded_${currentUser.id}`;
+    if (localStorage.getItem(flag) === '1') return false;
+    return hasOnboardingTask();
+  }
+
+  function start(initialStep = 0) {
     if (active) return;
     active = true;
-    stepIndex = 0;
+    stepIndex = Math.max(0, Math.min(initialStep, steps.length - 1));
     document.getElementById('onboardingRoot').style.display = '';
     bindHandlers();
     render();
   }
 
-  async function finish(persist = true) {
+  function startAtKey(key) {
+    const idx = stepIndexByKey(key);
+    if (idx >= 0) start(idx);
+  }
+
+  /**
+   * Close the tour.
+   *  - If the user is not yet on the farewell step, jump to it so they always
+   *    see the "다시 볼 수 있어요" reminder one last time.
+   *  - If they are already on the farewell step (or we're called from there),
+   *    persist and hide everything.
+   */
+  async function finish() {
     if (!active) return;
+    if (stepIndex !== steps.length - 1) {
+      stepIndex = steps.length - 1;
+      render();
+      return;
+    }
     active = false;
     document.getElementById('onboardingRoot').style.display = 'none';
     unbindHandlers();
-    if (persist && currentUser) {
+    if (currentUser) {
       localStorage.setItem(`taskmanager_onboarded_${currentUser.id}`, '1');
       try {
         const updated = await api(`/api/users/${currentUser.id}/complete-onboarding`, {
@@ -2132,7 +2199,7 @@ const Onboarding = (() => {
 
   function next() {
     if (stepIndex >= steps.length - 1) {
-      finish(true);
+      finish();
       return;
     }
     stepIndex += 1;
@@ -2170,7 +2237,6 @@ const Onboarding = (() => {
 
     const el = getTargetEl();
     if (!el) {
-      // No target → solid dim, no pulse/arrow
       overlay.style.clipPath = '';
       overlay.style.background = 'rgba(8, 10, 16, 0.55)';
       pulse.style.display = 'none';
@@ -2185,7 +2251,6 @@ const Onboarding = (() => {
     const x2 = Math.min(window.innerWidth, r.right + pad);
     const y2 = Math.min(window.innerHeight, r.bottom + pad);
 
-    // Cut a rectangular hole in the overlay for the target
     overlay.style.clipPath = `polygon(
       0 0, 100% 0, 100% 100%, 0 100%, 0 0,
       ${x1}px ${y1}px,
@@ -2196,21 +2261,16 @@ const Onboarding = (() => {
     )`;
     overlay.style.background = 'rgba(8, 10, 16, 0.55)';
 
-    // Pulse dot at the top-right corner of the target (matches the mock)
     pulse.style.display = '';
     pulse.style.left = `${x2 - 9}px`;
     pulse.style.top = `${y1 - 9}px`;
 
-    // Arrow from above the mascot bubble to the target's nearest edge
     const mascotRect = mascotWrap.getBoundingClientRect();
     const fromX = mascotRect.left + mascotRect.width / 2;
     const fromY = mascotRect.top - 8;
-    const targetCenterX = (x1 + x2) / 2;
     const targetCenterY = (y1 + y2) / 2;
-    // Aim at the closest edge of the target rectangle to the mascot
     const aimX = Math.max(x1, Math.min(fromX, x2));
     const aimY = fromY < y1 ? y2 : (fromY > y2 ? y1 : targetCenterY);
-    // Quadratic curve control point: pull arc upward
     const cx = (fromX + aimX) / 2;
     const cy = Math.min(fromY, aimY) - Math.min(180, Math.abs(fromX - aimX) * 0.4 + 60);
 
@@ -2233,12 +2293,15 @@ const Onboarding = (() => {
     indicator.textContent = `${stepIndex + 1} / ${steps.length}`;
 
     const nextBtn = document.getElementById('onboardingNextBtn');
+    const skipBtn = document.getElementById('onboardingSkipBtn');
     nextBtn.textContent = stepIndex === steps.length - 1
-      ? (step.finalLabel || '시작하기')
+      ? (step.finalLabel || '확인')
       : '다음';
     nextBtn.style.display = '';
+    // On the farewell step there's nothing to skip — hide "닫기" so the only
+    // exit is "확인" after reading the reminder.
+    skipBtn.style.display = stepIndex === steps.length - 1 ? 'none' : '';
 
-    // Quiz handling
     const quizEl = document.getElementById('onboardingQuiz');
     const quizOpts = document.getElementById('onboardingQuizOptions');
     const quizFb = document.getElementById('onboardingQuizFeedback');
@@ -2248,34 +2311,45 @@ const Onboarding = (() => {
 
     if (step.quiz) {
       quizEl.style.display = '';
-      // Disable "다음" until correct answer
       nextBtn.disabled = true;
       nextBtn.style.opacity = '0.5';
 
+      let answered = false;
       step.quiz.options.forEach((opt) => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'onboarding-quiz-option';
         b.textContent = opt.label;
         b.addEventListener('click', () => {
+          if (answered) return;
           if (opt.correct) {
+            answered = true;
             b.classList.add('correct');
-            // Disable all options
             quizOpts.querySelectorAll('button').forEach(o => { o.disabled = true; });
-            quizFb.textContent = opt.feedback;
+            quizFb.textContent = step.quiz.praise;
             quizFb.classList.add('is-correct');
             quizFb.style.display = '';
             nextBtn.disabled = false;
             nextBtn.style.opacity = '';
-            // Spotlight the actual answer location for fun
-            currentTargetGetter = () => document.getElementById('claudeCharacter');
-            positionTarget();
           } else {
+            // First wrong click reveals the answer in the feedback area AND
+            // visually highlights the correct option. Further clicks do nothing.
+            answered = true;
             b.classList.add('wrong');
-            b.disabled = true;
-            quizFb.textContent = opt.feedback;
+            quizOpts.querySelectorAll('button').forEach((other, i) => {
+              other.disabled = true;
+              if (step.quiz.options[i].correct) {
+                other.classList.add('correct');
+              }
+            });
+            quizFb.textContent = step.quiz.reveal;
             quizFb.classList.add('is-wrong');
             quizFb.style.display = '';
+            // Spotlight the easter-egg location so the user can spot it
+            currentTargetGetter = () => document.getElementById('claudeCharacter');
+            positionTarget();
+            nextBtn.disabled = false;
+            nextBtn.style.opacity = '';
           }
         });
         quizOpts.appendChild(b);
@@ -2286,7 +2360,6 @@ const Onboarding = (() => {
       nextBtn.style.opacity = '';
     }
 
-    // Position after layout settles
     requestAnimationFrame(positionTarget);
     setTimeout(positionTarget, 100);
   }
@@ -2296,18 +2369,32 @@ const Onboarding = (() => {
       if (active) next();
     });
     document.getElementById('onboardingSkipBtn').addEventListener('click', () => {
-      if (active) finish(true);
+      if (active) finish();
     });
   }
 
   bindButtons();
 
   return {
-    maybeStart() {
-      if (shouldStart()) start();
-    },
+    maybeStart() { if (shouldAutoStart()) start(0); },
     start,
+    startAtKey,
     finish,
+    isOnboardingTaskTitle(title) { return TITLE_TO_STEP.hasOwnProperty(title); },
+    stepKeyForTaskTitle(title) { return TITLE_TO_STEP[title] || null; },
+    async restart() {
+      if (!currentWorkspace) return;
+      try {
+        await api(`/api/workspaces/${currentWorkspace.id}/reseed-onboarding`, {
+          method: 'POST',
+        });
+        await loadTasks();
+        renderBoard();
+        start(0);
+      } catch (err) {
+        alert('온보딩 재시작 실패: ' + err.message);
+      }
+    },
   };
 })();
 
