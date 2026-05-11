@@ -2042,7 +2042,7 @@ const Onboarding = (() => {
   const steps = [
     {
       key: STEP_WELCOME,
-      title: '환영합니다 👋',
+      title: '환영합니다 👋  Task Manager 둘러보기',
       body:
         '안녕하세요. Task 관리와 주간보고를 동시에 쓸 수 있는 Task Manager에 오신걸 환영합니다.\n\n' +
         '시스템 온보딩을 위해 왼쪽 TODO 컬럼에 미리 만들어 둔 4개의 일감을 함께 살펴볼게요. ' +
@@ -2051,6 +2051,7 @@ const Onboarding = (() => {
     },
     {
       key: STEP_COLUMNS,
+      title: '드래그로 옮기는 5단계 칸반 보드',
       body:
         '이 화면이 칸반 보드입니다.\n' +
         '• TODO — 아직 시작 안 한 일\n' +
@@ -2063,6 +2064,7 @@ const Onboarding = (() => {
     },
     {
       key: STEP_ADD_TASK,
+      title: '＋ Add Task — 풍성한 일감 생성',
       body:
         '컬럼 하단의 "+ Add Task" 버튼으로 새 일감을 만들 수 있습니다.\n' +
         '제목, 우선순위, 담당자, 마감일, 태그, 커버 이미지까지 자유롭게 채울 수 있어요.',
@@ -2070,6 +2072,7 @@ const Onboarding = (() => {
     },
     {
       key: STEP_NOTIF,
+      title: '@멘션 → 🔔 실시간 알림',
       body:
         '댓글에서 @닉네임으로 팀원을 멘션하면 우측 상단의 🔔로 알림이 전달됩니다.\n' +
         '개인 일감 관리부터 팀 협업까지 모두 한 화면에서 처리할 수 있어요.',
@@ -2077,6 +2080,7 @@ const Onboarding = (() => {
     },
     {
       key: STEP_ARCHIVE,
+      title: 'ARCHIVE 컬럼 & Browse Archived',
       body:
         '완료된 일감은 ARCHIVE로 옮겨 보드를 깔끔하게 유지하세요.\n\n' +
         '카드를 우측 ARCHIVE 영역으로 드래그하거나, 일감을 열고 "Archive" 버튼을 누르면 됩니다.\n' +
@@ -2085,6 +2089,7 @@ const Onboarding = (() => {
     },
     {
       key: STEP_WEEKLY,
+      title: '✨ AI 주간보고서 자동 생성',
       body:
         '상단 "Weekly Report" 버튼을 누르면 LLM이 한 주 동안의 일감 변동, 댓글, 상태 변화를 종합해 ' +
         '주간보고서를 자동으로 작성해 줍니다.\n\n' +
@@ -2094,9 +2099,9 @@ const Onboarding = (() => {
     },
     {
       key: STEP_QUIZ,
+      title: '🎁 숨겨진 Task Generator — 깜짝 퀴즈',
       body:
-        '마지막은 깜짝 퀴즈입니다 🎉\n\n' +
-        'Task Generator는 큰 목표를 LLM이 잘게 나눠 여러 일감으로 만들어주는 이스터에그예요. ' +
+        'Task Generator는 큰 목표를 LLM이 잘게 나눠 여러 일감으로 만들어주는 이스터에그예요.\n' +
         '아래 셋 중 진짜 여는 방법은 무엇일까요?',
       target: null,
       quiz: {
@@ -2118,7 +2123,7 @@ const Onboarding = (() => {
     },
     {
       key: STEP_FAREWELL,
-      title: '이제 준비 완료! 🚀',
+      title: '🚀 이제 준비 완료!',
       body:
         '온보딩은 여기까지에요.\n\n' +
         '왼쪽 TODO에 남은 온보딩 일감을 다시 클릭하면 해당 단계부터 이어서 볼 수 있고, ' +
@@ -2288,9 +2293,10 @@ const Onboarding = (() => {
     const step = steps[stepIndex];
     currentTargetGetter = step.target;
 
+    const titleEl = document.getElementById('onboardingBubbleTitle');
     const bodyEl = document.getElementById('onboardingBubbleBody');
-    const titleHtml = step.title ? `<strong>${escHtml(step.title)}</strong>\n\n` : '';
-    bodyEl.innerHTML = titleHtml + escHtml(step.body || '');
+    titleEl.textContent = step.title || '';
+    bodyEl.textContent = step.body || '';
 
     const indicator = document.getElementById('onboardingStepIndicator');
     indicator.textContent = `${stepIndex + 1} / ${steps.length}`;
