@@ -1113,3 +1113,173 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Onboarding ─────────────────────────────────── */
+.onboarding-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+}
+
+.onboarding-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 10, 16, 0.55);
+  pointer-events: auto;
+  transition: clip-path 0.3s ease, background 0.2s;
+}
+
+/* Pulse dot anchored to a target's edge (matches the orange dot in the mock) */
+.onboarding-pulse {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+  animation: onbPulse 1.6s ease-out infinite;
+  pointer-events: none;
+  z-index: 9002;
+}
+
+@keyframes onbPulse {
+  0%   { box-shadow: 0 0 0 0    rgba(245, 158, 11, 0.7); transform: scale(1); }
+  70%  { box-shadow: 0 0 0 18px rgba(245, 158, 11, 0);   transform: scale(1.05); }
+  100% { box-shadow: 0 0 0 0    rgba(245, 158, 11, 0);   transform: scale(1); }
+}
+
+/* Arrow SVG covering the viewport. Path is set dynamically. */
+.onboarding-arrow {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9001;
+  overflow: visible;
+}
+.onboarding-arrow path {
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.6));
+}
+
+/* Mascot + bubble pinned to the bottom center, like the screenshot */
+.onboarding-mascot-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: auto;
+  max-width: min(720px, calc(100vw - 48px));
+  z-index: 9003;
+}
+
+.onboarding-mascot {
+  flex: 0 0 auto;
+  width: 64px;
+  animation: onbMascotBounce 1.8s ease-in-out infinite;
+}
+.onboarding-mascot-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+}
+@keyframes onbMascotBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+.onboarding-bubble {
+  flex: 1 1 auto;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  position: relative;
+}
+.onboarding-bubble::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  bottom: 18px;
+  width: 12px;
+  height: 12px;
+  background: var(--surface2);
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+.onboarding-bubble-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.onboarding-bubble-body strong {
+  color: #f59e0b;
+}
+.onboarding-bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.onboarding-spacer { flex: 1 1 auto; }
+.onboarding-step-indicator {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Quiz */
+.onboarding-quiz {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.onboarding-quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.onboarding-quiz-option {
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+.onboarding-quiz-option:hover {
+  background: var(--surface2);
+  border-color: var(--text-muted);
+}
+.onboarding-quiz-option:active { transform: scale(0.99); }
+.onboarding-quiz-option.correct {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: var(--success);
+  color: #d1fae5;
+}
+.onboarding-quiz-option.wrong {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: var(--danger);
+  color: #fee2e2;
+}
+.onboarding-quiz-option:disabled {
+  cursor: default;
+}
+.onboarding-quiz-feedback {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.onboarding-quiz-feedback.is-correct { color: #34d399; }
+.onboarding-quiz-feedback.is-wrong { color: #fca5a5; }

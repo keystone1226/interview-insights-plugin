@@ -1985,3 +1985,340 @@ document.addEventListener('click', e => {
     panel.classList.remove('active');
   }
 });
+
+/* ── Onboarding ─────────────────────────────────── */
+const Onboarding = (() => {
+  let stepIndex = 0;
+  let active = false;
+  let resizeHandler = null;
+  let scrollHandler = null;
+  let currentTargetGetter = null;
+
+  // Step definitions. Each step targets either a CSS selector (resolved each
+  // re-layout), a function returning an element, or null for "no target".
+  const steps = [
+    {
+      title: '환영합니다 👋',
+      body:
+        '안녕하세요. Task 관리와 주간보고를 동시에 쓸 수 있는 Task Manager에 오신걸 환영합니다.\n\n' +
+        '시스템 온보딩을 위해 왼쪽 TODO 컬럼에 미리 만들어 둔 4개의 일감을 함께 살펴볼게요. ' +
+        '언제든지 "닫기"로 종료할 수 있어요.',
+      target: null,
+    },
+    {
+      body:
+        '이 화면이 칸반 보드입니다.\n' +
+        '• TODO — 아직 시작 안 한 일\n' +
+        '• IN PROGRESS — 진행 중\n' +
+        '• REVIEW — 검토 대기\n' +
+        '• DONE — 완료\n' +
+        '• ARCHIVE — 보드에서 치워둔 일\n\n' +
+        '카드를 드래그해서 컬럼 사이를 이동할 수 있어요.',
+      target: () => document.querySelector('#board .column'),
+    },
+    {
+      body:
+        '컬럼 하단의 "+ Add Task" 버튼으로 새 일감을 만들 수 있습니다.\n' +
+        '제목, 우선순위, 담당자, 마감일, 태그, 커버 이미지까지 자유롭게 채울 수 있어요.',
+      target: () => document.querySelector('.add-task-btn'),
+    },
+    {
+      body:
+        '댓글에서 @닉네임으로 팀원을 멘션하면 우측 상단의 🔔로 알림이 전달됩니다.\n' +
+        '개인 일감 관리부터 팀 협업까지 모두 한 화면에서 처리할 수 있어요.',
+      target: () => document.getElementById('notifBell'),
+    },
+    {
+      body:
+        '완료된 일감은 ARCHIVE로 옮겨 보드를 깔끔하게 유지하세요.\n\n' +
+        '카드를 우측 ARCHIVE 영역으로 드래그하거나, 일감을 열고 "Archive" 버튼을 누르면 됩니다.\n' +
+        '보관된 일감은 "Browse Archived"에서 언제든 다시 볼 수 있어요.',
+      target: () => document.querySelector('.archive-body'),
+    },
+    {
+      body:
+        '상단 "Weekly Report" 버튼을 누르면 LLM이 한 주 동안의 일감 변동, 댓글, 상태 변화를 종합해 ' +
+        '주간보고서를 자동으로 작성해 줍니다.\n\n' +
+        '• System Prompt 로 보고서 톤·규칙을 지정\n' +
+        '• Example Report Template 에 우리 팀 보고서 한 편을 붙여두면 그 형식을 Few-shot으로 따라합니다.',
+      target: () => document.getElementById('reportBtn'),
+    },
+    {
+      body:
+        '마지막은 깜짝 퀴즈입니다 🎉\n\n' +
+        'Task Generator는 큰 목표를 LLM이 잘게 나눠 여러 일감으로 만들어주는 이스터에그예요. ' +
+        '어디에 숨어있을까요? 보기에서 골라보세요.',
+      target: null,
+      quiz: {
+        question: 'Task Generator를 여는 방법은?',
+        options: [
+          {
+            label: '🛸  ARCHIVE 컬럼 안의 외계인 캐릭터를 1초 안에 3번 빠르게 클릭',
+            correct: true,
+            feedback:
+              '정답! 아카이브 안의 작은 외계인 친구를 따다닥 3번 클릭하면 Task Generator가 열립니다. ' +
+              '한 번 시도해보세요.',
+          },
+          {
+            label: '⚙️  헤더의 톱니바퀴를 길게 눌러 메뉴에서 선택',
+            correct: false,
+            feedback: '땡! 사실 톱니바퀴 자체가 없어요 😅 다시 골라보세요.',
+          },
+          {
+            label: '⌨️  Ctrl+Shift+G 단축키 입력',
+            correct: false,
+            feedback: '아쉽! 단축키는 아니에요. 외계인을 잘 살펴보세요 👽',
+          },
+        ],
+      },
+    },
+    {
+      title: '이제 준비 완료! 🚀',
+      body:
+        '온보딩은 여기까지에요.\n\n' +
+        '왼쪽에 남아있는 4개의 온보딩 일감은 그대로 두었으니 직접 드래그·아카이브·삭제하며 익혀보세요. ' +
+        '도움말은 언제든 우측 상단 ? 버튼에서 다시 볼 수 있습니다.',
+      target: null,
+      finalLabel: '시작하기',
+    },
+  ];
+
+  function shouldStart() {
+    if (!currentUser || !currentWorkspace) return false;
+    // Backend says onboarded_at is set → skip
+    if (currentUser.onboarded_at) return false;
+    // localStorage flag → skip
+    const flag = `taskmanager_onboarded_${currentUser.id}`;
+    if (localStorage.getItem(flag) === '1') return false;
+    // Only show when this workspace actually has the seeded onboarding tasks
+    const hasOnboardingTasks = tasks.some(t => {
+      try {
+        const tags = parseTags(t.tags);
+        return tags.includes('onboarding');
+      } catch {
+        return false;
+      }
+    });
+    return hasOnboardingTasks;
+  }
+
+  function start() {
+    if (active) return;
+    active = true;
+    stepIndex = 0;
+    document.getElementById('onboardingRoot').style.display = '';
+    bindHandlers();
+    render();
+  }
+
+  async function finish(persist = true) {
+    if (!active) return;
+    active = false;
+    document.getElementById('onboardingRoot').style.display = 'none';
+    unbindHandlers();
+    if (persist && currentUser) {
+      localStorage.setItem(`taskmanager_onboarded_${currentUser.id}`, '1');
+      try {
+        const updated = await api(`/api/users/${currentUser.id}/complete-onboarding`, {
+          method: 'POST',
+        });
+        currentUser = { ...currentUser, ...updated };
+        localStorage.setItem('taskmanager_user', JSON.stringify(currentUser));
+      } catch (err) {
+        console.warn('complete-onboarding failed:', err);
+      }
+    }
+  }
+
+  function next() {
+    if (stepIndex >= steps.length - 1) {
+      finish(true);
+      return;
+    }
+    stepIndex += 1;
+    render();
+  }
+
+  function bindHandlers() {
+    resizeHandler = () => positionTarget();
+    scrollHandler = () => positionTarget();
+    window.addEventListener('resize', resizeHandler);
+    window.addEventListener('scroll', scrollHandler, true);
+  }
+  function unbindHandlers() {
+    if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+    if (scrollHandler) window.removeEventListener('scroll', scrollHandler, true);
+    resizeHandler = scrollHandler = null;
+    currentTargetGetter = null;
+  }
+
+  function getTargetEl() {
+    if (!currentTargetGetter) return null;
+    try {
+      return currentTargetGetter();
+    } catch {
+      return null;
+    }
+  }
+
+  function positionTarget() {
+    const overlay = document.getElementById('onboardingOverlay');
+    const pulse = document.getElementById('onboardingPulse');
+    const arrow = document.getElementById('onboardingArrow');
+    const arrowPath = document.getElementById('onboardingArrowPath');
+    const mascotWrap = document.getElementById('onboardingMascotWrap');
+
+    const el = getTargetEl();
+    if (!el) {
+      // No target → solid dim, no pulse/arrow
+      overlay.style.clipPath = '';
+      overlay.style.background = 'rgba(8, 10, 16, 0.55)';
+      pulse.style.display = 'none';
+      arrow.style.display = 'none';
+      return;
+    }
+
+    const r = el.getBoundingClientRect();
+    const pad = 6;
+    const x1 = Math.max(0, r.left - pad);
+    const y1 = Math.max(0, r.top - pad);
+    const x2 = Math.min(window.innerWidth, r.right + pad);
+    const y2 = Math.min(window.innerHeight, r.bottom + pad);
+
+    // Cut a rectangular hole in the overlay for the target
+    overlay.style.clipPath = `polygon(
+      0 0, 100% 0, 100% 100%, 0 100%, 0 0,
+      ${x1}px ${y1}px,
+      ${x1}px ${y2}px,
+      ${x2}px ${y2}px,
+      ${x2}px ${y1}px,
+      ${x1}px ${y1}px
+    )`;
+    overlay.style.background = 'rgba(8, 10, 16, 0.55)';
+
+    // Pulse dot at the top-right corner of the target (matches the mock)
+    pulse.style.display = '';
+    pulse.style.left = `${x2 - 9}px`;
+    pulse.style.top = `${y1 - 9}px`;
+
+    // Arrow from above the mascot bubble to the target's nearest edge
+    const mascotRect = mascotWrap.getBoundingClientRect();
+    const fromX = mascotRect.left + mascotRect.width / 2;
+    const fromY = mascotRect.top - 8;
+    const targetCenterX = (x1 + x2) / 2;
+    const targetCenterY = (y1 + y2) / 2;
+    // Aim at the closest edge of the target rectangle to the mascot
+    const aimX = Math.max(x1, Math.min(fromX, x2));
+    const aimY = fromY < y1 ? y2 : (fromY > y2 ? y1 : targetCenterY);
+    // Quadratic curve control point: pull arc upward
+    const cx = (fromX + aimX) / 2;
+    const cy = Math.min(fromY, aimY) - Math.min(180, Math.abs(fromX - aimX) * 0.4 + 60);
+
+    arrow.style.display = '';
+    arrowPath.setAttribute(
+      'd',
+      `M ${fromX} ${fromY} Q ${cx} ${cy} ${aimX} ${aimY}`
+    );
+  }
+
+  function render() {
+    const step = steps[stepIndex];
+    currentTargetGetter = step.target;
+
+    const bodyEl = document.getElementById('onboardingBubbleBody');
+    const titleHtml = step.title ? `<strong>${escHtml(step.title)}</strong>\n\n` : '';
+    bodyEl.innerHTML = titleHtml + escHtml(step.body || '');
+
+    const indicator = document.getElementById('onboardingStepIndicator');
+    indicator.textContent = `${stepIndex + 1} / ${steps.length}`;
+
+    const nextBtn = document.getElementById('onboardingNextBtn');
+    nextBtn.textContent = stepIndex === steps.length - 1
+      ? (step.finalLabel || '시작하기')
+      : '다음';
+    nextBtn.style.display = '';
+
+    // Quiz handling
+    const quizEl = document.getElementById('onboardingQuiz');
+    const quizOpts = document.getElementById('onboardingQuizOptions');
+    const quizFb = document.getElementById('onboardingQuizFeedback');
+    quizFb.style.display = 'none';
+    quizFb.className = 'onboarding-quiz-feedback';
+    quizOpts.innerHTML = '';
+
+    if (step.quiz) {
+      quizEl.style.display = '';
+      // Disable "다음" until correct answer
+      nextBtn.disabled = true;
+      nextBtn.style.opacity = '0.5';
+
+      step.quiz.options.forEach((opt) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'onboarding-quiz-option';
+        b.textContent = opt.label;
+        b.addEventListener('click', () => {
+          if (opt.correct) {
+            b.classList.add('correct');
+            // Disable all options
+            quizOpts.querySelectorAll('button').forEach(o => { o.disabled = true; });
+            quizFb.textContent = opt.feedback;
+            quizFb.classList.add('is-correct');
+            quizFb.style.display = '';
+            nextBtn.disabled = false;
+            nextBtn.style.opacity = '';
+            // Spotlight the actual answer location for fun
+            currentTargetGetter = () => document.getElementById('claudeCharacter');
+            positionTarget();
+          } else {
+            b.classList.add('wrong');
+            b.disabled = true;
+            quizFb.textContent = opt.feedback;
+            quizFb.classList.add('is-wrong');
+            quizFb.style.display = '';
+          }
+        });
+        quizOpts.appendChild(b);
+      });
+    } else {
+      quizEl.style.display = 'none';
+      nextBtn.disabled = false;
+      nextBtn.style.opacity = '';
+    }
+
+    // Position after layout settles
+    requestAnimationFrame(positionTarget);
+    setTimeout(positionTarget, 100);
+  }
+
+  function bindButtons() {
+    document.getElementById('onboardingNextBtn').addEventListener('click', () => {
+      if (active) next();
+    });
+    document.getElementById('onboardingSkipBtn').addEventListener('click', () => {
+      if (active) finish(true);
+    });
+  }
+
+  bindButtons();
+
+  return {
+    maybeStart() {
+      if (shouldStart()) start();
+    },
+    start,
+    finish,
+  };
+})();
+
+// Hook into startApp lifecycle: after the board is rendered the first time,
+// check whether to start onboarding for this user/workspace.
+const _origStartApp = startApp;
+startApp = async function patchedStartApp() {
+  await _origStartApp.apply(this, arguments);
+  try {
+    Onboarding.maybeStart();
+  } catch (err) {
+    console.warn('Onboarding start failed:', err);
+  }
+};

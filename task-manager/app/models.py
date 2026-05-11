@@ -30,6 +30,7 @@ class UserBase(SQLModel):
 class User(UserBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    onboarded_at: Optional[datetime] = Field(default=None)
 
     tasks: list["Task"] = Relationship(back_populates="assignee_user")
     comments: list["Comment"] = Relationship(back_populates="author")
@@ -44,6 +45,7 @@ class UserCreate(UserBase):
 class UserRead(UserBase):
     id: int
     created_at: datetime
+    onboarded_at: Optional[datetime] = None
 
 
 # ── Workspace ─────────────────────────────────────────

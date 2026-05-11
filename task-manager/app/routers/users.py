@@ -1,5 +1,7 @@
 """User (nickname) management routes."""
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
@@ -33,4 +35,21 @@ def get_user(user_id: int, session: Session = Depends(get_session)):
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@router.post("/{user_id}/complete-onboarding", response_model=UserRead)
+def complete_onboarding(user_id: int, session: Session = Depends(get_session)):
+    """Mark a user as having completed the onboarding flow.
+
+    Idempotent: calling twice keeps the original timestamp.
+    """
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.onboarded_at is None:
+        user.onboarded_at = datetime.utcnow()
+        session.add(user)
+        session.commit()
+        session.refresh(user)
     return user

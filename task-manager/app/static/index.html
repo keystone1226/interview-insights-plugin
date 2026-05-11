@@ -389,6 +389,54 @@
     </div>
   </div>
 
+  <!-- Onboarding -->
+  <div class="onboarding-root" id="onboardingRoot" style="display:none">
+    <!-- Spotlight overlay (clip-path hole around target element) -->
+    <div class="onboarding-overlay" id="onboardingOverlay"></div>
+    <!-- Pulse dot anchored to a target element -->
+    <div class="onboarding-pulse" id="onboardingPulse" style="display:none"></div>
+    <!-- Arrow pointing from bubble to target -->
+    <svg class="onboarding-arrow" id="onboardingArrow" viewBox="0 0 100 100" style="display:none">
+      <defs>
+        <marker id="onbArrowHead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b"/>
+        </marker>
+      </defs>
+      <path id="onboardingArrowPath" d="" stroke="#f59e0b" stroke-width="3" fill="none" stroke-dasharray="6 6" marker-end="url(#onbArrowHead)"/>
+    </svg>
+
+    <!-- Mascot + bubble (bottom center fixed) -->
+    <div class="onboarding-mascot-wrap" id="onboardingMascotWrap">
+      <div class="onboarding-mascot" id="onboardingMascot">
+        <svg class="onboarding-mascot-svg" viewBox="0 0 120 100">
+          <rect x="30" y="41" width="60" height="44" fill="#E88B5F"/>
+          <rect x="22" y="56" width="8" height="15" fill="#E88B5F"/>
+          <rect x="90" y="56" width="8" height="15" fill="#E88B5F"/>
+          <rect x="30" y="85" width="8" height="15" fill="#E88B5F"/>
+          <rect x="44" y="85" width="8" height="15" fill="#E88B5F"/>
+          <rect x="68" y="85" width="8" height="15" fill="#E88B5F"/>
+          <rect x="82" y="85" width="8" height="15" fill="#E88B5F"/>
+          <rect x="36" y="50" width="8" height="8" fill="#111"/>
+          <rect x="71" y="50" width="8" height="8" fill="#111"/>
+        </svg>
+      </div>
+      <div class="onboarding-bubble" id="onboardingBubble">
+        <div class="onboarding-bubble-body" id="onboardingBubbleBody"></div>
+        <!-- Quiz area for the final step (shown only on quiz steps) -->
+        <div class="onboarding-quiz" id="onboardingQuiz" style="display:none">
+          <div class="onboarding-quiz-options" id="onboardingQuizOptions"></div>
+          <div class="onboarding-quiz-feedback" id="onboardingQuizFeedback" style="display:none"></div>
+        </div>
+        <div class="onboarding-bubble-actions">
+          <span class="onboarding-step-indicator" id="onboardingStepIndicator"></span>
+          <span class="onboarding-spacer"></span>
+          <button type="button" class="btn btn-sm btn-secondary" id="onboardingSkipBtn">닫기</button>
+          <button type="button" class="btn btn-sm btn-primary" id="onboardingNextBtn">다음</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>

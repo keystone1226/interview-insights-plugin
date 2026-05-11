@@ -80,6 +80,71 @@ def list_workspaces(
     return [_to_read(w) for w in session.exec(query).all()]
 
 
+_ONBOARDING_TASKS = [
+    {
+        "title": "일감 생성하기",
+        "description": (
+            "이 화면이 바로 칸반 보드입니다. 각 컬럼은 일감의 상태를 나타냅니다.\n\n"
+            "• TODO — 아직 시작하지 않은 일\n"
+            "• IN PROGRESS — 지금 진행 중인 일\n"
+            "• REVIEW — 동료의 검토를 기다리는 일\n"
+            "• DONE — 완료된 일\n"
+            "• ARCHIVE — 더 이상 보드에 두지 않을 보관된 일\n\n"
+            "+ Add Task 버튼으로 새 일감을 만들 수 있고, 댓글에서 @닉네임으로 멘션하면 "
+            "상단의 🔔 알림으로 전달돼요. 개인 일정 관리부터 팀 협업까지 모두 가능합니다.\n\n"
+            "👉 다음 안내를 따라 직접 일감을 한 번 만들어보세요."
+        ),
+    },
+    {
+        "title": "일감 아카이브 해보기",
+        "description": (
+            "끝난 일감은 ARCHIVE로 옮겨 보드를 깔끔하게 유지하세요.\n\n"
+            "방법은 두 가지입니다.\n"
+            "1) 카드를 우측 ARCHIVE 영역으로 드래그\n"
+            "2) 일감을 열고 'Archive' 버튼 클릭\n\n"
+            "보관된 일감은 ARCHIVE 카드의 'Browse Archived'에서 언제든 다시 볼 수 있어요."
+        ),
+    },
+    {
+        "title": "AI에게 주간보고 요청하기",
+        "description": (
+            "상단 'Weekly Report' 버튼을 누르면 LLM이 일주일 동안의 일감 변동, 댓글, "
+            "상태 변화를 종합해 자동으로 주간보고서를 작성해 줍니다.\n\n"
+            "• System Prompt — 보고서의 톤과 규칙을 정의 (예: '경어체로 작성하라')\n"
+            "• Example Report Template — Few-shot 예시. 실제 우리 팀의 주간보고 형식을 "
+            "한 번 붙여넣으면 LLM이 그 형식을 따라 새 내용을 작성합니다.\n\n"
+            "두 입력만 잘 채워두면 매주 한 번의 클릭으로 보고서가 완성돼요."
+        ),
+    },
+    {
+        "title": "Task Generator 사용하기 (퀴즈)",
+        "description": (
+            "Task Generator는 큰 목표를 LLM으로 잘게 나눠 여러 개의 일감으로 만들어주는 "
+            "이스터에그 기능입니다. 어디에 숨어있을까요? 🤔\n\n"
+            "👉 다음 안내에서 3지선다 퀴즈로 직접 찾아보세요."
+        ),
+    },
+]
+
+
+def _seed_onboarding_tasks(session: Session, workspace_id: int) -> None:
+    """Seed the four onboarding tasks into a workspace's TODO column."""
+    now = datetime.utcnow()
+    for idx, item in enumerate(_ONBOARDING_TASKS):
+        task = Task(
+            title=item["title"],
+            description=item["description"],
+            status="TODO",
+            priority="MEDIUM",
+            tags=json.dumps(["onboarding"], ensure_ascii=False),
+            sort_order=idx,
+            workspace_id=workspace_id,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(task)
+
+
 @router.post("", response_model=WorkspaceRead, status_code=201)
 def create_workspace(
     data: WorkspaceCreate,
@@ -113,6 +178,20 @@ def create_workspace(
     ]
     for col in defaults:
         session.add(col)
+
+    # Seed onboarding tasks for first-time users only.
+    # A user is considered "first-time" if they have not yet completed onboarding
+    # AND this is their very first workspace membership.
+    if owner_id:
+        owner = session.get(User, owner_id)
+        if owner and owner.onboarded_at is None:
+            other_memberships = session.exec(
+                select(WorkspaceMember)
+                .where(WorkspaceMember.user_id == owner_id)
+                .where(WorkspaceMember.workspace_id != workspace.id)
+            ).first()
+            if not other_memberships:
+                _seed_onboarding_tasks(session, workspace.id)
 
     session.commit()
     session.refresh(workspace)
