@@ -2097,24 +2097,23 @@ const Onboarding = (() => {
       body:
         '마지막은 깜짝 퀴즈입니다 🎉\n\n' +
         'Task Generator는 큰 목표를 LLM이 잘게 나눠 여러 일감으로 만들어주는 이스터에그예요. ' +
-        '한 보기만 정답입니다. 골라보세요.',
+        '아래 셋 중 진짜 여는 방법은 무엇일까요?',
       target: null,
       quiz: {
-        // Three deliberately similar-length options. The correct one does NOT
-        // describe the actual mechanism — that hint is only revealed after a
-        // wrong click.
         options: [
-          { label: 'A. 알 수 없는 어딘가에 잘 숨어있다',           correct: true  },
-          { label: 'B. 우측 상단의 메뉴 어딘가에 있다',             correct: false },
-          { label: 'C. 키보드 단축키로 열 수 있다',                 correct: false },
+          { label: '1) Claude Code 캐릭터 위에 마우스를 3초 동안 호버한다',  correct: false },
+          { label: '2) Task 생성 버튼을 더블클릭 한다',                      correct: false },
+          { label: '3) Claude Code 캐릭터를 빠르게 세 번 클릭한다',          correct: true  },
         ],
-        // Shown only after a wrong click. The first wrong answer reveals the
-        // real answer; subsequent wrong clicks just repeat the hint.
+        // Shown regardless of right/wrong — the user might guess right
+        // without knowing why, so we always reveal the actual mechanism and
+        // spotlight the character so they can try it immediately.
+        praise:
+          '정답입니다 🎉 ARCHIVE 컬럼 안의 Claude Code 외계인 친구를 1초 안에 ' +
+          '3번 따다닥 클릭하면 Task Generator가 열립니다. 지금 한 번 시도해보세요!',
         reveal:
-          '정답은 A 였어요. 사실 정답은 — ARCHIVE 컬럼 안의 작은 외계인 친구를 ' +
+          '정답은 3번이에요. ARCHIVE 컬럼 안의 Claude Code 외계인 친구를 ' +
           '1초 안에 3번 따다닥 클릭하면 Task Generator가 열립니다 👽',
-        // Shown when the user picks the correct option on the first try.
-        praise: '정답입니다 🎉 비밀은 직접 발견해보는 재미가 있어요. 한 번 찾아보세요.',
       },
     },
     {
@@ -2153,9 +2152,13 @@ const Onboarding = (() => {
   }
 
   function start(initialStep = 0) {
-    if (active) return;
-    active = true;
     stepIndex = Math.max(0, Math.min(initialStep, steps.length - 1));
+    if (active) {
+      // Already showing → just jump to the requested step
+      render();
+      return;
+    }
+    active = true;
     document.getElementById('onboardingRoot').style.display = '';
     bindHandlers();
     render();
@@ -2329,6 +2332,9 @@ const Onboarding = (() => {
             quizFb.textContent = step.quiz.praise;
             quizFb.classList.add('is-correct');
             quizFb.style.display = '';
+            // Spotlight the easter-egg location so the user knows where to try
+            currentTargetGetter = () => document.getElementById('claudeCharacter');
+            positionTarget();
             nextBtn.disabled = false;
             nextBtn.style.opacity = '';
           } else {
