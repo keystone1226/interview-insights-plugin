@@ -54,6 +54,9 @@ def _notify_assignment(session: Session, task: Task, changed_by: str | None = No
     """Create notification when a task is assigned."""
     if not task.assignee_id:
         return
+    assignee = session.get(User, task.assignee_id)
+    if assignee and assignee.is_external:
+        return
     msg = f'"{task.title}" 태스크가 당신에게 배정되었습니다.'
     notification = Notification(
         user_id=task.assignee_id,
@@ -204,9 +207,15 @@ def delete_task(
     task = session.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    # Record deletion history before deleting
     _record_history(session, task, "deleted", task.status, None, changed_by_id=user_id)
-    # Clean up image file if exists
+    # Clean up relations
+    from app.models import TaskRelation
+    for rel in session.exec(
+        select(TaskRelation).where(
+            (TaskRelation.parent_id == task_id) | (TaskRelation.child_id == task_id)
+        )
+    ).all():
+        session.delete(rel)
     if task.image_path:
         img_file = UPLOAD_DIR / Path(task.image_path).name
         if img_file.exists():
@@ -351,9 +360,13 @@ DEFAULT_TASK_GEN_PROMPT = (
     "3. 제목은 구체적이고 행동 중심(동사로 시작)으로 작성하세요.\n"
     "4. 설명은 1-2문장으로 무엇을 해야 하는지, 왜 필요한지 간결하게 적으세요.\n"
     "5. 우선순위는 HIGH, MEDIUM, LOW 중 하나를 선택하세요.\n"
-    "6. 일감 수는 목표 규모에 맞게 5~15개 사이로 생성하세요.\n\n"
+    "6. 계층 구조를 사용하세요. 상위 일감의 children 배열에 하위 일감을 넣으세요.\n"
+    "7. 연계성, 우선순위, 작업 순서를 고려하여 계층을 구성하세요.\n"
+    "8. 최상위 일감 3~7개, 각 일감당 하위 1~4개 정도가 적절합니다.\n\n"
     '응답 형식:\n'
-    '[{"title": "일감 제목", "description": "일감 설명", "priority": "MEDIUM"}, ...]'
+    '[{"title": "상위 일감", "description": "설명", "priority": "HIGH", "children": [\n'
+    '  {"title": "하위 일감", "description": "설명", "priority": "MEDIUM"}\n'
+    ']}, ...]'
 )
 
 
@@ -403,13 +416,24 @@ async def generate_tasks(data: TaskGenerateRequest):
             detail=f"LLM 응답을 파싱할 수 없습니다. 시스템 프롬프트에서 JSON 형식을 요구하세요.\n\n응답:\n{raw[:500]}",
         )
 
-    valid = []
-    for item in items:
-        if isinstance(item, dict) and "title" in item:
-            valid.append({
+    flat = []
+
+    def _flatten(items, parent_idx=None):
+        for item in items:
+            if not isinstance(item, dict) or "title" not in item:
+                continue
+            idx = len(flat)
+            flat.append({
                 "title": str(item["title"]),
                 "description": str(item.get("description", "")),
                 "priority": str(item.get("priority", "MEDIUM")).upper(),
+                "parent_index": parent_idx,
             })
+            children = item.get("children", [])
+            if isinstance(children, list):
+                _flatten(children, parent_idx=idx)
+
+    _flatten(items)
+    valid = flat
 
     return {"items": valid}

@@ -14,6 +14,7 @@
       <button class="btn btn-sm btn-secondary" id="restoreBackupBtn" title="Restore Backup" style="display:none">Restore Backup</button>
       <input type="file" id="restoreFileInput" accept=".md,.db" style="display:none">
       <button class="btn btn-sm btn-secondary" id="switchWorkspaceBtn" title="Switch Workspace" style="display:none">Switch Workspace</button>
+      <button class="btn btn-sm btn-secondary" id="taskMapBtn" title="Task Map">Task Map</button>
       <button class="btn btn-sm btn-secondary" id="reportBtn" title="Weekly Report">Weekly Report</button>
       <button class="notification-bell" id="notifBell" title="Notifications">
         &#128276;
@@ -70,6 +71,10 @@
                 <select id="taskAssignee">
                   <option value="">Unassigned</option>
                 </select>
+                <div class="assignee-custom-row">
+                  <input type="text" id="taskAssigneeCustom" style="display:none" placeholder="이름 입력" maxlength="50">
+                  <button type="button" class="btn btn-sm btn-secondary" id="taskAssigneeCustomCancel" style="display:none">Cancel</button>
+                </div>
               </div>
             </div>
             <div class="form-row">
@@ -102,6 +107,17 @@
             </div>
           </div>
           <div class="modal-col-right" id="taskModalRight" style="display:none">
+            <div class="related-tasks-section" id="relatedTasksSection">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <h3 style="margin:0">Related Tasks</h3>
+                <button type="button" class="btn btn-sm btn-primary" id="openTaskMapFromModal" style="font-size:11px">Task Map &rsaquo;</button>
+              </div>
+              <div class="related-tasks-scroll" id="relatedTasksList"></div>
+              <div class="add-relation-row">
+                <input type="text" id="relationSearchInput" placeholder="Search tasks to link...">
+                <div class="relation-search-dropdown" id="relationSearchDropdown"></div>
+              </div>
+            </div>
             <div class="comments-section" id="commentsSection">
               <h3>Comments</h3>
               <div class="comments-scroll" id="commentsList"></div>
@@ -338,6 +354,19 @@
       <div id="archiveList" class="archive-list">
         <div class="archive-empty">No archived tasks</div>
       </div>
+    </div>
+  </div>
+
+  <!-- Task Map Modal -->
+  <div class="modal-overlay" id="taskMapModal">
+    <div class="modal" style="max-width:90vw;max-height:90vh;width:90vw;height:85vh;padding:0;overflow:hidden;display:flex;flex-direction:column">
+      <div class="task-map-toolbar">
+        <h2 style="margin:0;font-size:16px">Task Map</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm btn-secondary" id="taskMapCloseBtn">Close</button>
+        </div>
+      </div>
+      <div class="task-map-container" id="taskMapContainer"></div>
     </div>
   </div>
 

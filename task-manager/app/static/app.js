@@ -13,6 +13,7 @@ let claudeWalkTimer = null;
 let claudeLegTimer = null;
 let claudeClickTimes = [];
 let taskGenItems = [];
+let allRelations = { nodes: [], edges: [] };
 
 const TAG_COLORS = [
   '#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6',
@@ -613,6 +614,7 @@ async function loadUsers() {
 
 async function loadTasks() {
   tasks = await api('/api/tasks');
+  try { allRelations = await api('/api/relations/graph'); } catch { allRelations = { nodes: [], edges: [] }; }
 }
 
 /* ── Notifications ──────────────────────────────── */
@@ -828,12 +830,18 @@ function renderTaskCard(task) {
     </a>`);
   }
 
+  const childCount = allRelations.edges.filter(e => e.parent_id === task.id).length;
+  const parentCount = allRelations.edges.filter(e => e.child_id === task.id).length;
+  const relBadge = childCount > 0 ? `<span class="tag-badge" style="background:rgba(99,102,241,0.15);color:var(--primary);font-size:10px" title="${childCount} subtask(s)">&#9662; ${childCount}</span>` : '';
+  const parentBadge = parentCount > 0 ? `<span class="tag-badge" style="background:rgba(99,102,241,0.10);color:var(--text-muted);font-size:10px" title="Has parent">&#9652;</span>` : '';
+
   return `
     <div class="task-card" draggable="true" data-id="${task.id}">
       ${coverImg}
       <div class="task-card-title">${escHtml(task.title)}</div>
       <div class="task-card-meta">
         <span class="priority-badge priority-${task.priority}">${task.priority}</span>
+        ${relBadge}${parentBadge}
         ${tags.map(t => `<span class="tag-badge" style="background:${tagColor(t)}22;color:${tagColor(t)}">${escHtml(t)}</span>`).join('')}
         ${linkIcons.join('')}
         ${dueDateHtml}
@@ -854,8 +862,21 @@ function openTaskModal(task, defaultStatus) {
 
   // Populate assignee dropdown
   const assigneeSelect = document.getElementById('taskAssignee');
-  assigneeSelect.innerHTML = '<option value="">Unassigned</option>' +
-    allUsers.map(u => `<option value="${u.id}">${escHtml(u.nickname)}</option>`).join('');
+  const internalUsers = allUsers.filter(u => !u.is_external);
+  const externalUsers = allUsers.filter(u => u.is_external);
+  let assigneeOpts = '<option value="">Unassigned</option>';
+  assigneeOpts += internalUsers.map(u => `<option value="${u.id}">${escHtml(u.nickname)}</option>`).join('');
+  if (externalUsers.length) {
+    assigneeOpts += '<option disabled>── External ──</option>';
+    assigneeOpts += externalUsers.map(u => `<option value="${u.id}">${escHtml(u.nickname)}</option>`).join('');
+  }
+  assigneeOpts += '<option value="__custom__">+ 직접 입력</option>';
+  assigneeSelect.innerHTML = assigneeOpts;
+  const customInput = document.getElementById('taskAssigneeCustom');
+  const customCancel = document.getElementById('taskAssigneeCustomCancel');
+  customInput.style.display = 'none';
+  customCancel.style.display = 'none';
+  assigneeSelect.style.display = '';
 
   const createdAtEl = document.getElementById('taskCreatedAt');
   const archiveBtn = document.getElementById('archiveTaskBtn');
@@ -877,6 +898,7 @@ function openTaskModal(task, defaultStatus) {
     if (rightCol) rightCol.style.display = '';
     if (modalColumns) modalColumns.classList.remove('single-col');
     loadComments(task.id);
+    loadRelatedTasks(task.id);
 
     // Show created_at
     const created = new Date(task.created_at);
@@ -916,6 +938,28 @@ document.getElementById('cancelTaskBtn').addEventListener('click', closeTaskModa
 // clicking outside the dialog used to wipe out in-progress input.
 // Close/Cancel/Delete buttons are the only way to dismiss it now.
 
+document.getElementById('taskAssignee').addEventListener('change', e => {
+  const customInput = document.getElementById('taskAssigneeCustom');
+  const customCancel = document.getElementById('taskAssigneeCustomCancel');
+  if (e.target.value === '__custom__') {
+    e.target.style.display = 'none';
+    customInput.style.display = '';
+    customCancel.style.display = '';
+    customInput.value = '';
+    customInput.focus();
+  }
+});
+
+document.getElementById('taskAssigneeCustomCancel').addEventListener('click', () => {
+  const select = document.getElementById('taskAssignee');
+  const customInput = document.getElementById('taskAssigneeCustom');
+  const customCancel = document.getElementById('taskAssigneeCustomCancel');
+  select.style.display = '';
+  select.value = '';
+  customInput.style.display = 'none';
+  customCancel.style.display = 'none';
+});
+
 document.getElementById('taskForm').addEventListener('submit', async e => {
   e.preventDefault();
   const id = document.getElementById('taskId').value;
@@ -924,12 +968,23 @@ document.getElementById('taskForm').addEventListener('submit', async e => {
     ? JSON.stringify(tagsRaw.split(',').map(t => t.trim()).filter(Boolean))
     : null;
 
+  let assigneeId = document.getElementById('taskAssignee').value || null;
+  const customInput = document.getElementById('taskAssigneeCustom');
+  if (customInput.style.display !== 'none' && customInput.value.trim()) {
+    const extUser = await api('/api/users', {
+      method: 'POST',
+      body: JSON.stringify({ nickname: customInput.value.trim(), is_external: true }),
+    });
+    assigneeId = extUser.id;
+    allUsers = await api('/api/users');
+  }
+
   const data = {
     title: document.getElementById('taskTitle').value,
     description: document.getElementById('taskDesc').value || null,
     status: document.getElementById('taskStatus').value,
     priority: document.getElementById('taskPriority').value,
-    assignee_id: document.getElementById('taskAssignee').value || null,
+    assignee_id: assigneeId,
     due_date: document.getElementById('taskDueDate').value || null,
     tags,
     figma_url: document.getElementById('taskFigma').value || null,
@@ -1026,14 +1081,62 @@ async function loadComments(taskId) {
   }
   list.innerHTML = comments.map(c => {
     const content = c.content.replace(/@(\S+)/g, '<span class="mention">@$1</span>');
+    const isOwn = currentUser && c.author_id === currentUser.id;
+    const edited = c.updated_at && c.updated_at !== c.created_at ? ' (edited)' : '';
     return `
-      <div class="comment">
-        <span class="comment-author">${escHtml(c.author?.nickname || 'Unknown')}</span>
-        <span class="comment-time">${timeAgo(c.created_at)}</span>
+      <div class="comment" data-comment-id="${c.id}" data-task-id="${taskId}">
+        <div class="comment-header-row">
+          <span class="comment-author">${escHtml(c.author?.nickname || 'Unknown')}</span>
+          <span class="comment-time">${timeAgo(c.created_at)}${edited}</span>
+          ${isOwn ? `<span class="comment-actions">
+            <button class="comment-action-btn" data-action="edit" title="Edit">&#9998;</button>
+            <button class="comment-action-btn" data-action="delete" title="Delete">&times;</button>
+          </span>` : ''}
+        </div>
         <div class="comment-content">${content}</div>
       </div>
     `;
   }).join('');
+
+  list.querySelectorAll('[data-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const commentEl = e.target.closest('.comment');
+      const commentId = commentEl.dataset.commentId;
+      const contentEl = commentEl.querySelector('.comment-content');
+      const original = contentEl.textContent;
+      contentEl.innerHTML = `
+        <textarea class="comment-edit-textarea">${escHtml(original)}</textarea>
+        <div class="comment-edit-actions">
+          <button class="btn btn-sm btn-primary comment-save-btn">Save</button>
+          <button class="btn btn-sm btn-secondary comment-cancel-btn">Cancel</button>
+        </div>
+      `;
+      const textarea = contentEl.querySelector('textarea');
+      textarea.focus();
+      contentEl.querySelector('.comment-save-btn').addEventListener('click', async () => {
+        const newContent = textarea.value.trim();
+        if (!newContent) return;
+        await api(`/api/tasks/${taskId}/comments/${commentId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ content: newContent }),
+        });
+        loadComments(taskId);
+      });
+      contentEl.querySelector('.comment-cancel-btn').addEventListener('click', () => {
+        loadComments(taskId);
+      });
+    });
+  });
+
+  list.querySelectorAll('[data-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      if (!confirm('댓글을 삭제하시겠습니까?')) return;
+      const commentEl = e.target.closest('.comment');
+      const commentId = commentEl.dataset.commentId;
+      await api(`/api/tasks/${taskId}/comments/${commentId}`, { method: 'DELETE' });
+      loadComments(taskId);
+    });
+  });
 }
 
 document.getElementById('addCommentBtn').addEventListener('click', async () => {
@@ -1268,6 +1371,305 @@ function showClaudeHeart() {
   }, 1500);
 }
 
+/* ── Related Tasks ────────────────────────────── */
+
+async function loadRelatedTasks(taskId) {
+  const section = document.getElementById('relatedTasksSection');
+  const list = document.getElementById('relatedTasksList');
+  if (!section || !list) return;
+
+  try {
+    const data = await api(`/api/relations/task/${taskId}`);
+    const parents = data.parents || [];
+    const children = data.children || [];
+
+    if (!parents.length && !children.length) {
+      list.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:4px 0">No related tasks</div>';
+      return;
+    }
+
+    let html = '';
+    if (parents.length) {
+      html += '<div class="related-label">Parents</div>';
+      html += parents.map(r => renderMiniCard(r, taskId)).join('');
+    }
+    if (children.length) {
+      html += '<div class="related-label">Children</div>';
+      html += children.map(r => renderMiniCard(r, taskId)).join('');
+    }
+    list.innerHTML = html;
+
+    list.querySelectorAll('.related-mini-card').forEach(card => {
+      card.addEventListener('click', e => {
+        if (e.target.closest('.related-mini-card-remove')) return;
+        const relTaskId = parseInt(card.dataset.taskId);
+        const relTask = tasks.find(t => t.id === relTaskId);
+        if (relTask) openTaskModal(relTask);
+      });
+    });
+
+    list.querySelectorAll('.related-mini-card-remove').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const relId = parseInt(btn.dataset.relationId);
+        await api(`/api/relations/${relId}`, { method: 'DELETE' });
+        loadRelatedTasks(taskId);
+      });
+    });
+  } catch (err) {
+    list.innerHTML = '';
+  }
+}
+
+function renderMiniCard(rel, currentTaskId) {
+  const statusColors = { TODO: 'var(--low)', IN_PROGRESS: 'var(--primary)', REVIEW: 'var(--medium)', DONE: 'var(--success)' };
+  return `
+    <div class="related-mini-card" data-task-id="${rel.task_id}">
+      <button class="related-mini-card-remove" data-relation-id="${rel.relation_id}" title="Remove link">&times;</button>
+      <div class="related-mini-card-title">${escHtml(rel.title)}</div>
+      <div class="related-mini-card-meta">
+        ${rel.assignee_name ? escHtml(rel.assignee_name) : ''}
+      </div>
+      <span class="related-mini-card-status" style="color:${statusColors[rel.status] || 'var(--text-muted)'}">${rel.status}</span>
+    </div>
+  `;
+}
+
+// Relation search
+const relationSearchInput = document.getElementById('relationSearchInput');
+const relationSearchDropdown = document.getElementById('relationSearchDropdown');
+let relationSearchTimer = null;
+
+if (relationSearchInput) {
+  relationSearchInput.addEventListener('input', () => {
+    clearTimeout(relationSearchTimer);
+    const query = relationSearchInput.value.trim().toLowerCase();
+    if (!query) {
+      relationSearchDropdown.classList.remove('active');
+      return;
+    }
+    relationSearchTimer = setTimeout(() => {
+      const taskId = parseInt(document.getElementById('taskId').value);
+      const matches = tasks.filter(t =>
+        t.id !== taskId && t.title.toLowerCase().includes(query)
+      ).slice(0, 8);
+
+      if (!matches.length) {
+        relationSearchDropdown.classList.remove('active');
+        return;
+      }
+      relationSearchDropdown.innerHTML = matches.map(t => `
+        <div class="relation-search-option" data-id="${t.id}">${escHtml(t.title)} <span style="color:var(--text-muted);font-size:10px">${t.status}</span></div>
+      `).join('');
+      relationSearchDropdown.classList.add('active');
+
+      relationSearchDropdown.querySelectorAll('.relation-search-option').forEach(opt => {
+        opt.addEventListener('click', async () => {
+          const childId = parseInt(opt.dataset.id);
+          const parentId = taskId;
+          try {
+            await api('/api/relations', {
+              method: 'POST',
+              body: JSON.stringify({ parent_id: parentId, child_id: childId }),
+            });
+          } catch (err) {
+            alert(err.message);
+          }
+          relationSearchDropdown.classList.remove('active');
+          relationSearchInput.value = '';
+          loadRelatedTasks(parentId);
+        });
+      });
+    }, 200);
+  });
+}
+
+// Task Map button in modal
+document.getElementById('openTaskMapFromModal')?.addEventListener('click', () => {
+  const taskId = document.getElementById('taskId').value;
+  openTaskMap(taskId ? parseInt(taskId) : null);
+});
+
+// Task Map button in header
+document.getElementById('taskMapBtn')?.addEventListener('click', () => openTaskMap(null));
+
+/* ── Task Map ────────────────────────────────── */
+
+async function openTaskMap(focusTaskId) {
+  const modal = document.getElementById('taskMapModal');
+  const container = document.getElementById('taskMapContainer');
+  modal.classList.add('active');
+
+  const graphData = await api('/api/relations/graph');
+  renderTaskMap(container, graphData, focusTaskId);
+}
+
+function renderTaskMap(container, graphData, focusTaskId) {
+  const { nodes, edges } = graphData;
+  if (!nodes.length) {
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted)">No tasks in this workspace</div>';
+    return;
+  }
+
+  // Build adjacency info for layout
+  const adjacency = {};
+  nodes.forEach(n => adjacency[n.id] = { parents: [], children: [] });
+  edges.forEach(e => {
+    if (adjacency[e.parent_id]) adjacency[e.parent_id].children.push(e.child_id);
+    if (adjacency[e.child_id]) adjacency[e.child_id].parents.push(e.parent_id);
+  });
+
+  // Simple force-directed layout
+  const W = container.clientWidth || 800;
+  const H = container.clientHeight || 600;
+  const nodeMap = {};
+  nodes.forEach((n, i) => {
+    nodeMap[n.id] = {
+      ...n,
+      x: W / 2 + (Math.random() - 0.5) * W * 0.6,
+      y: H / 2 + (Math.random() - 0.5) * H * 0.6,
+      vx: 0, vy: 0,
+    };
+  });
+
+  // Focus node starts at center
+  if (focusTaskId && nodeMap[focusTaskId]) {
+    nodeMap[focusTaskId].x = W / 2;
+    nodeMap[focusTaskId].y = H / 2;
+  }
+
+  const nodeArr = Object.values(nodeMap);
+  const repulsion = 8000;
+  const attraction = 0.005;
+  const damping = 0.85;
+
+  for (let iter = 0; iter < 120; iter++) {
+    // Repulsion
+    for (let i = 0; i < nodeArr.length; i++) {
+      for (let j = i + 1; j < nodeArr.length; j++) {
+        let dx = nodeArr[i].x - nodeArr[j].x;
+        let dy = nodeArr[i].y - nodeArr[j].y;
+        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        let force = repulsion / (dist * dist);
+        let fx = (dx / dist) * force;
+        let fy = (dy / dist) * force;
+        nodeArr[i].vx += fx;
+        nodeArr[i].vy += fy;
+        nodeArr[j].vx -= fx;
+        nodeArr[j].vy -= fy;
+      }
+    }
+    // Attraction
+    edges.forEach(e => {
+      const a = nodeMap[e.parent_id];
+      const b = nodeMap[e.child_id];
+      if (!a || !b) return;
+      let dx = b.x - a.x;
+      let dy = b.y - a.y;
+      let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      a.vx += dx * attraction;
+      a.vy += dy * attraction;
+      b.vx -= dx * attraction;
+      b.vy -= dy * attraction;
+    });
+    // Update positions
+    nodeArr.forEach(n => {
+      n.vx *= damping;
+      n.vy *= damping;
+      n.x += n.vx;
+      n.y += n.vy;
+      n.x = Math.max(80, Math.min(W - 80, n.x));
+      n.y = Math.max(40, Math.min(H - 40, n.y));
+    });
+  }
+
+  // Render
+  const statusColors = { TODO: '#6b7280', IN_PROGRESS: '#6366f1', REVIEW: '#f59e0b', DONE: '#10b981' };
+
+  let svg = `<svg class="task-map-svg" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-muted)"/></marker></defs>`;
+  edges.forEach(e => {
+    const a = nodeMap[e.parent_id];
+    const b = nodeMap[e.child_id];
+    if (!a || !b) return;
+    svg += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="var(--border)" stroke-width="1.5" marker-end="url(#arrowhead)"/>`;
+  });
+  svg += '</svg>';
+
+  let nodesHtml = '';
+  nodeArr.forEach(n => {
+    const color = statusColors[n.status] || '#6b7280';
+    const focused = n.id === focusTaskId ? ' focused' : '';
+    nodesHtml += `
+      <div class="task-map-node${focused}" style="left:${n.x - 70}px;top:${n.y - 22}px;border-left:3px solid ${color}" data-node-id="${n.id}">
+        <div class="task-map-node-title">${escHtml(n.title)}</div>
+        <div class="task-map-node-meta">
+          <span>${n.status}</span>
+          ${n.assignee ? `<span>· ${escHtml(n.assignee)}</span>` : ''}
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = svg + nodesHtml;
+
+  // Click to open task
+  container.querySelectorAll('.task-map-node').forEach(node => {
+    node.addEventListener('dblclick', () => {
+      const taskId = parseInt(node.dataset.nodeId);
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        document.getElementById('taskMapModal').classList.remove('active');
+        openTaskModal(task);
+      }
+    });
+  });
+
+  // Make nodes draggable
+  let dragNode = null;
+  let dragOffsetX = 0, dragOffsetY = 0;
+
+  container.querySelectorAll('.task-map-node').forEach(node => {
+    node.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      dragNode = node;
+      const rect = node.getBoundingClientRect();
+      dragOffsetX = e.clientX - rect.left;
+      dragOffsetY = e.clientY - rect.top;
+      node.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+  });
+
+  container.addEventListener('mousemove', e => {
+    if (!dragNode) return;
+    const cRect = container.getBoundingClientRect();
+    const x = e.clientX - cRect.left - dragOffsetX;
+    const y = e.clientY - cRect.top - dragOffsetY;
+    dragNode.style.left = x + 'px';
+    dragNode.style.top = y + 'px';
+    // Update SVG edges
+    const nodeId = parseInt(dragNode.dataset.nodeId);
+    const nx = x + 70;
+    const ny = y + 22;
+    const svgEl = container.querySelector('svg');
+    svgEl.querySelectorAll('line').forEach((line, idx) => {
+      const edge = edges[idx];
+      if (!edge) return;
+      if (edge.parent_id === nodeId) { line.setAttribute('x1', nx); line.setAttribute('y1', ny); }
+      if (edge.child_id === nodeId) { line.setAttribute('x2', nx); line.setAttribute('y2', ny); }
+    });
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (dragNode) { dragNode.style.cursor = 'grab'; dragNode = null; }
+  });
+}
+
+document.getElementById('taskMapCloseBtn')?.addEventListener('click', () => {
+  document.getElementById('taskMapModal').classList.remove('active');
+});
+
 /* ── Task Generator (Easter Egg) ──────────────── */
 
 const DEFAULT_TASK_GEN_PROMPT = `당신은 프로젝트 매니저 어시스턴트입니다. 사용자가 입력한 목표/과업을 팀원들이 바로 착수할 수 있는 작은 단위의 일감으로 분해해주세요.
@@ -1278,10 +1680,14 @@ const DEFAULT_TASK_GEN_PROMPT = `당신은 프로젝트 매니저 어시스턴�
 3. 제목은 구체적이고 행동 중심(동사로 시작)으로 작성하세요.
 4. 설명은 1-2문장으로 무엇을 해야 하는지, 왜 필요한지 간결하게 적으세요.
 5. 우선순위는 HIGH, MEDIUM, LOW 중 하나를 선택하세요.
-6. 일감 수는 목표 규모에 맞게 5~15개 사이로 생성하세요.
+6. 계층 구조를 사용하세요. 상위 일감의 children 배열에 하위 일감을 넣으세요.
+7. 연계성, 우선순위, 작업 순서를 고려하여 계층을 구성하세요.
+8. 최상위 일감 3~7개, 각 일감당 하위 1~4개 정도가 적절합니다.
 
 응답 형식:
-[{"title": "일감 제목", "description": "일감 설명", "priority": "MEDIUM"}, ...]`;
+[{"title": "상위 일감", "description": "설명", "priority": "HIGH", "children": [
+  {"title": "하위 일감", "description": "설명", "priority": "MEDIUM"}
+]}, ...]`;
 
 function openTaskGenModal() {
   const modal = document.getElementById('taskGenModal');
@@ -1302,8 +1708,10 @@ function renderTaskGenItems() {
   const priorityColors = { HIGH: 'var(--high)', MEDIUM: 'var(--medium)', LOW: 'var(--low)' };
   const priorityBgs = { HIGH: 'rgba(239,68,68,0.15)', MEDIUM: 'rgba(245,158,11,0.15)', LOW: 'rgba(107,114,128,0.15)' };
 
-  list.innerHTML = taskGenItems.map((item, i) => `
-    <div class="task-gen-item ${item.checked ? '' : 'unchecked'}" data-idx="${i}">
+  list.innerHTML = taskGenItems.map((item, i) => {
+    const indent = item.parent_index != null ? 'margin-left:24px;border-left:2px solid var(--primary);' : '';
+    return `
+    <div class="task-gen-item ${item.checked ? '' : 'unchecked'}" data-idx="${i}" style="${indent}">
       <div class="task-gen-item-header">
         <input type="checkbox" ${item.checked ? 'checked' : ''} data-gen-check="${i}">
         <div class="task-gen-item-body">
@@ -1312,8 +1720,8 @@ function renderTaskGenItems() {
           <span class="task-gen-item-priority" style="color:${priorityColors[item.priority] || priorityColors.MEDIUM};background:${priorityBgs[item.priority] || priorityBgs.MEDIUM}">${item.priority || 'MEDIUM'}</span>
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   list.querySelectorAll('[data-gen-check]').forEach(cb => {
     cb.addEventListener('change', e => {
@@ -1448,10 +1856,15 @@ document.getElementById('taskGenCreateBtn').addEventListener('click', async () =
   createBtn.disabled = true;
   createBtn.textContent = 'Creating...';
 
+  // Map original index → created task id for relation linking
+  const indexToTaskId = {};
   let created = 0;
-  for (const item of selected) {
+
+  for (let i = 0; i < taskGenItems.length; i++) {
+    const item = taskGenItems[i];
+    if (!item.checked) continue;
     try {
-      await api('/api/tasks', {
+      const newTask = await api('/api/tasks', {
         method: 'POST',
         body: JSON.stringify({
           title: item.title,
@@ -1460,9 +1873,26 @@ document.getElementById('taskGenCreateBtn').addEventListener('click', async () =
           status: 'TODO',
         }),
       });
+      indexToTaskId[i] = newTask.id;
       created++;
     } catch (err) {
       console.error('Failed to create task:', item.title, err);
+    }
+  }
+
+  // Create relations for items with parent_index
+  for (let i = 0; i < taskGenItems.length; i++) {
+    const item = taskGenItems[i];
+    if (!item.checked || item.parent_index == null) continue;
+    const parentTaskId = indexToTaskId[item.parent_index];
+    const childTaskId = indexToTaskId[i];
+    if (parentTaskId && childTaskId) {
+      try {
+        await api('/api/relations', {
+          method: 'POST',
+          body: JSON.stringify({ parent_id: parentTaskId, child_id: childTaskId }),
+        });
+      } catch {}
     }
   }
 

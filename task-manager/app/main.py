@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 
 from app.config import DB_PATH, DEFAULT_HOST, DEFAULT_PORT, UPLOAD_DIR
 from app.database import engine, init_default_columns, run_migrations
-from app.routers import columns, comments, notifications, reports, tasks, users, workspaces
+from app.routers import columns, comments, notifications, relations, reports, tasks, users, workspaces
 
 # Resolve directories using Path for cross-platform compatibility
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -48,6 +48,7 @@ app.include_router(comments.router)
 app.include_router(notifications.router)
 app.include_router(columns.router)
 app.include_router(reports.router)
+app.include_router(relations.router)
 
 # Mount static files
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

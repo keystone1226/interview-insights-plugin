@@ -1,15 +1,18 @@
 """Comment routes with @mention support."""
 
 import re
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.database import get_session
+from app.deps import get_user_id
 from app.models import (
     Comment,
     CommentCreate,
     CommentRead,
+    CommentUpdate,
     Notification,
     NotificationType,
     Task,
@@ -101,3 +104,40 @@ def create_comment(
     session.refresh(comment)
 
     return comment
+
+
+@router.patch("/{comment_id}", response_model=CommentRead)
+def update_comment(
+    task_id: int,
+    comment_id: int,
+    data: CommentUpdate,
+    session: Session = Depends(get_session),
+    user_id: int | None = Depends(get_user_id),
+):
+    comment = session.get(Comment, comment_id)
+    if not comment or comment.task_id != task_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.author_id != user_id:
+        raise HTTPException(status_code=403, detail="Only the author can edit this comment")
+    comment.content = data.content
+    comment.updated_at = datetime.utcnow()
+    session.add(comment)
+    session.commit()
+    session.refresh(comment)
+    return comment
+
+
+@router.delete("/{comment_id}", status_code=204)
+def delete_comment(
+    task_id: int,
+    comment_id: int,
+    session: Session = Depends(get_session),
+    user_id: int | None = Depends(get_user_id),
+):
+    comment = session.get(Comment, comment_id)
+    if not comment or comment.task_id != task_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.author_id != user_id:
+        raise HTTPException(status_code=403, detail="Only the author can delete this comment")
+    session.delete(comment)
+    session.commit()

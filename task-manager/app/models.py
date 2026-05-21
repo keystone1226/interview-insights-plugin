@@ -25,6 +25,7 @@ class NotificationType(str, Enum):
 class UserBase(SQLModel):
     nickname: str = Field(index=True, unique=True, max_length=50)
     email: Optional[str] = Field(default=None, max_length=200)
+    is_external: bool = Field(default=False)
 
 
 class User(UserBase, table=True):
@@ -37,8 +38,10 @@ class User(UserBase, table=True):
     workspace_members: list["WorkspaceMember"] = Relationship(back_populates="user")
 
 
-class UserCreate(UserBase):
-    pass
+class UserCreate(SQLModel):
+    nickname: str
+    email: Optional[str] = None
+    is_external: bool = False
 
 
 class UserRead(UserBase):
@@ -198,6 +201,30 @@ class TaskStatusUpdate(SQLModel):
     sort_order: int = 0
 
 
+# ── Task Relation ────────────────────────────────────────
+
+
+class TaskRelation(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    parent_id: int = Field(foreign_key="task.id", index=True)
+    child_id: int = Field(foreign_key="task.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class TaskRelationCreate(SQLModel):
+    parent_id: int
+    child_id: int
+
+
+class TaskRelationInfo(SQLModel):
+    relation_id: int
+    task_id: int
+    title: str
+    status: str
+    priority: str
+    assignee_name: Optional[str] = None
+
+
 # ── Comment ───────────────────────────────────────────
 
 
@@ -210,6 +237,7 @@ class CommentBase(SQLModel):
 class Comment(CommentBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = Field(default=None)
 
     task: Optional[Task] = Relationship(back_populates="comments")
     author: Optional[User] = Relationship(back_populates="comments")
@@ -220,9 +248,14 @@ class CommentCreate(SQLModel):
     author_id: int
 
 
+class CommentUpdate(SQLModel):
+    content: str
+
+
 class CommentRead(CommentBase):
     id: int
     created_at: datetime
+    updated_at: Optional[datetime] = None
     author: Optional[UserRead] = None
 
 
