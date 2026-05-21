@@ -874,8 +874,8 @@ function openTaskModal(task, defaultStatus) {
   assigneeSelect.innerHTML = assigneeOpts;
   const customInput = document.getElementById('taskAssigneeCustom');
   const customCancel = document.getElementById('taskAssigneeCustomCancel');
-  customInput.style.display = 'none';
-  customCancel.style.display = 'none';
+  if (customInput) customInput.style.display = 'none';
+  if (customCancel) customCancel.style.display = 'none';
   assigneeSelect.style.display = '';
 
   const createdAtEl = document.getElementById('taskCreatedAt');
